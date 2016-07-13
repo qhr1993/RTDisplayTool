@@ -61,8 +61,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->widget_2->setInteraction(QCP::iRangeDrag, false);
     ui->widget_2->setInteraction(QCP::iRangeZoom, true);
     ui->widget_2->axisRect()->setRangeZoomAxes(ui->widget_2->yAxis,0);
-    ui->widget_2->xAxis->setAutoTickStep(false);
-    ui->widget_2->xAxis->setTickStep(1);
+    ui->widget_2->xAxis->setAutoTickStep(true);
+    //ui->widget_2->xAxis->setTickStep(1);
     ui->widget_2->xAxis->setAutoSubTicks(false);
     ui->widget_2->xAxis->setSubTickCount(0);
     ui->widget_2->xAxis->grid()->setVisible(false);
