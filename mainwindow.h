@@ -37,12 +37,13 @@ private:
     HistoSampleBuffer sampleHistoBuffer;
     int currentChan,currentSpecBd,currentHistoBd;
     int spectrumNumAvg,histoNumAvg;
-    template <typename T,typename P> void avg(T* out,P* in);
+    template <typename T,typename P> QList<double> avg(T* out,P* in);
     bool isHistoShown,isSpectrumShown;
     void manageCursor(QCustomPlot *customPlot, QCPCursor *cursor, double x, double y, QPen pen);
     bool cursorEnabled;
-    double xLimit;
+    double xLimit,xCentre,y2Max,yMax,yMin;
     Ui::MainWindow *ui;
+    Attributes attri;
 private slots:
     void on_pushButton_clicked();
     void onHeaderRcvd(QString header);
@@ -73,6 +74,8 @@ private slots:
 
     void on_pushButton_8_clicked();
     void onSignalError();
+    void on_pushButton_3_clicked();
+    void on_pushButton_10_clicked();
 };
 
 #endif // MAINWINDOW_H

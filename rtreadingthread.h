@@ -51,7 +51,7 @@ private:
     int getGNSData(QFile* currentFilePtr_A,QDataStream* inputStreamPtr_A, int *syncMode_A, int *skipWordCount_A, int *readWordCount_A,
                    int numBits_A, FFTSampleBuffer *ptr2Buffer_A, int *currentChan_A,bool* isFirst_A,
                   QFile* currentFilePtr_B,QDataStream* inputStreamPtr_B, int *syncMode_B, int *skipWordCount_B, int *readWordCount_B,
-                  int numBits_B, FFTSampleBuffer *ptr2Buffer_B, int *currentChan_B,bool* isFirst_B);
+                  int numBits_B, FFTSampleBuffer *ptr2Buffer_B, int *currentChan_B,bool* isFirst_B,bool hasB);
     QDir ramDiskPathA,ramDiskPathB;
     int fpgaSel;
     QDir gnsFile;
@@ -82,6 +82,7 @@ private:
     void clearRamDisk();
     bool removeDir(const QString & dirName);
     int isSetupMode();
+    int saveToTxt(FFTSamples samples,int numOfBits);
 signals:
     void dispHeader(QString header);
     void dispAttr(Attributes attr);

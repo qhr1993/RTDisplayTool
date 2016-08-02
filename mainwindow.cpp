@@ -37,6 +37,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     xLimit=40.92;
+    xCentre=1575.43;
+    y2Max=32768;
+    yMax=50;
+    yMin=0;
     ui->widget->clearGraphs();
     ui->widget->addGraph();
     ui->widget->graph(0)->setPen(QPen(Qt::blue));
@@ -119,7 +123,7 @@ void MainWindow::on_pushButton_clicked()
     else
         readingThread->setFPGASel(1);
     readingThread->isAlive=true;
-    readingThread->start(QThread::NormalPriority);
+    readingThread->start(QThread::HighPriority);
     frameCount=0;
     if (readingThread->isRunning())
     {
@@ -142,6 +146,7 @@ void MainWindow::onHeaderRcvd(QString header)
 void MainWindow::onAttrRcvd(Attributes attr)
 {
     ui->treeWidget->clear();
+    attri = attr;
     for (int i=0;i<4;i++)
     {
         if (!attr.signal[i].isEmpty())
@@ -214,13 +219,15 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         specBdFactor= pow(2,16-currentSpecBd);
         histoBdFactor = pow(2,16-currentHistoBd);
     }
-    //qWarning()<<samples.valuesI[0]<<samples.valuesI[1]<<samples.valuesI[2]<<samples.valuesI[3]<<samples.valuesI[4];
+    qWarning()<<samples.valuesI[0]<<samples.valuesI[1]<<samples.valuesI[2]<<samples.valuesI[3]<<samples.valuesI[4];
+
     if (newFlag)
     {
         sampleSpectrumBuffer.clear();
         sampleHistoBuffer.clear();
         xLimit=(double)(readingThread->attr.bw[currentChan-1])/2*1.023;
-        ui->widget->xAxis->setRange((-1)*xLimit,xLimit);
+        xCentre=(double) (readingThread->attr.freq[currentChan-1])*1.023;
+        ui->widget->xAxis->setRange((-1)*xLimit+xCentre ,xLimit+xCentre);
         qWarning()<<"new flag;";
     }
     if (newSpecBdFlag   &&  isSetupMode)
@@ -279,9 +286,9 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     for (int i=0;i<32768;i++)
     {
         if (i<16384)
-            xScale[i]=((double)i)/16384*xLimit;
+            xScale[i]=((double)i)/16384*xLimit + xCentre;
         else
-            xScale[i]=((double)i-32768)/16384*xLimit;
+            xScale[i]=((double)i-32768)/16384*xLimit + xCentre;
         //outMagLog[i]=10*log10(sqrt(((out[i+1][0])*(out[i+1][0])+(out[i+1][1])*(out[i+1][1]))/2));
         outMagLog[i]=(sqrt(((out[i][0])*(out[i][0])+(out[i][1])*(out[i][1]))/2));
     }
@@ -299,10 +306,13 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     while (sampleHistoBuffer.length()>=histoNumAvg)
         sampleHistoBuffer.removeFirst();
     sampleHistoBuffer.append(distribution);
-    avg(&tmpHistoSamples,&sampleHistoBuffer);
+    QList <double> scaleList2 = avg(&tmpHistoSamples,&sampleHistoBuffer);
+    y2Max = scaleList2.first();
     //qWarning()<<tmpHistoSamples;
     //qWarning()<<sampleHistoBuffer.last();
-    avg(&tmpSpectrumSamples,&sampleSpectrumBuffer);
+    QList <double> scaleList = avg(&tmpSpectrumSamples,&sampleSpectrumBuffer);
+    yMax = 10*log10(scaleList.first());
+    yMin = 10*log10(scaleList.last());
     for (int i=0;i<32768;i++)
         tmpSpectrumSamples[i]=10*log10(tmpSpectrumSamples[i]);
     //qWarning()<<tmpSpectrumSamples.at(1024);
@@ -328,6 +338,15 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     //qWarning()<<distribution;
     ui->label_4->setText(QString::number(samples.chan));
     ui->label_9->setText(QString::number(samples.chan));
+    if (newFlag)
+    {
+        ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
+        ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
+        ui->widget->yAxis->setRangeLower(-5+yMin);
+        ui->widget->yAxis->setRangeUpper(5+yMax);
+        ui->widget_2->yAxis->setRangeLower(0);
+        ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
+    }
 }
 
 void MainWindow::on_pushButton_6_clicked()
@@ -342,13 +361,13 @@ void MainWindow::on_pushButton_9_clicked()
 
 void MainWindow::onXAxisRangeChanged(QCPRange newRange,QCPRange oldRange)
 {
-    if(newRange.lower<(-1)*xLimit)
+    if(newRange.lower<(-1)*xLimit+xCentre)
     {
-        ui->widget->xAxis->setRangeLower(-1*xLimit);
+        ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
     }
-    if(newRange.upper>xLimit)
+    if(newRange.upper>xLimit+xCentre)
     {
-        ui->widget->xAxis->setRangeUpper(xLimit);
+        ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
     }
 }
 
@@ -376,9 +395,10 @@ void MainWindow::on2YAxisRangeChanged(QCPRange newRange,QCPRange oldRange)
     }
 }
 
-template <typename T,typename P> void MainWindow::avg(T* out,P* in)
+template <typename T,typename P> QList<double> MainWindow::avg(T* out,P* in)
 {
-    double tmp=0;
+    double tmp=0,max=-32768,min=32768;
+    QList <double> list;
     int sampleLength=in->first().size();
     out->clear();
     for (int i=0;i<sampleLength;i++)
@@ -386,8 +406,11 @@ template <typename T,typename P> void MainWindow::avg(T* out,P* in)
         for (int j=0;j<in->length();j++)
             tmp=tmp+in->at(j).at(i);
         (*out).append(tmp/(in->length()));
+        if ((*out).last()>max)    max = (*out).last();
+        if ((*out).last()<min)    min = (*out).last();
         tmp=0;
     }
+    return (list<<max<<min);
 }
 
 void MainWindow::on_comboBox_2_currentIndexChanged(const QString &arg1)
@@ -462,3 +485,32 @@ void MainWindow::onSignalError()
 //    customPlot->replot();
 //    cursorEnabled=true;
 //}
+
+//void MainWindow::on_pushButton_3_clicked()
+//{
+//    ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
+//    ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
+//}
+
+
+
+//void MainWindow::on_pushButton_10_clicked()
+//{
+//    ui->widget_2->yAxis->setRangeLower(0);
+//    ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
+//}
+
+void MainWindow::on_pushButton_3_clicked()
+{
+    ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
+    ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
+    ui->widget->yAxis->setRangeLower(-5+yMin);
+    ui->widget->yAxis->setRangeUpper(5+yMax);
+    qWarning()<<yMin<<yMax;
+}
+
+void MainWindow::on_pushButton_10_clicked()
+{
+    ui->widget_2->yAxis->setRangeLower(0);
+    ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
+}

@@ -129,7 +129,7 @@ void RTReadingThread::run()
         if (strategy==ST_SETUP)
         {
             bool isRecordingReg = ((isRecording()) && (isSetupMode()));
-            //qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
+           // qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
             //<<isRecordingReg;
             //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isRecordingReg;
             if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isRecordingReg)
@@ -163,7 +163,7 @@ void RTReadingThread::run()
 
             if ((!attr.signal[2].isEmpty()))
             {
-                //qWarning()<<currentFileB.absoluteFilePath();
+               // qWarning()<<currentFileB.absoluteFilePath();
                 if ((access(currentFileB.absoluteFilePath().toLatin1().data(),F_OK)+1) && isRecordingReg)
                 {
                     if (fileSeqB==0)
@@ -216,7 +216,7 @@ void RTReadingThread::run()
                 if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
                                 readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
                                 &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
-                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB))
+                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
                 {
                     qWarning()<<"Error";
                     break;
@@ -262,7 +262,7 @@ void RTReadingThread::run()
                 if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
                                 readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
                                 &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
-                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB))
+                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
                 {
                     qWarning()<<"Cannot open .A.gns.";
                     break;
@@ -379,7 +379,9 @@ int RTReadingThread::getHeader()
             else if (str.startsWith("-S"))
                 attr.bw[sig]=str.mid(2).toInt();
             else if (str.startsWith("-b"))
-                attr.numBits[sig]=str.mid(2).toInt();
+                {
+                    attr.numBits[sig]=16;
+                }
             else if (str.startsWith("-M"))
                 attr.freq[sig]=str.mid(2).toFloat();
         }
@@ -418,7 +420,7 @@ void RTReadingThread::getData(QFileInfo targetFile,int *syncMode,int *skipWordCo
         ptr2Buffer->clear();
         ptr2Buffer->reserve(BUFFER_SIZE);
     }
-    while (!endOfFile)
+    while ((!endOfFile) && isAlive)
     {
         if (readSel&&(skipWordCount[0]==skipWordCount[1]))
         {
@@ -467,7 +469,7 @@ void RTReadingThread::getData(QFileInfo targetFile,int *syncMode,int *skipWordCo
             if (ptr2Buffer->length()==BUFFER_SIZE)
                 ptr2Buffer->removeFirst();
             ptr2Buffer->append(currentFFTSamples);
-            qWarning()<<"new appeneded";
+            //qWarning()<<"new appended";
             mutex.unlock();
         }
         //skipWordCount[0]=skipWordCount[0]-inputStream.skipRawData(4*skipWordCount[0])/4;
@@ -606,7 +608,7 @@ int RTReadingThread::getInitialData(QFileInfo targetFile,int *syncMode,int *skip
 int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStreamPtr_A, int *syncMode_A, int *skipWordCount_A, int *readWordCount_A,
                                 int numBits_A, FFTSampleBuffer *ptr2Buffer_A,int *currentChan_A,bool* isFirst_A,
                                 QFile* currentFilePtr_B,QDataStream* inputStreamPtr_B, int *syncMode_B, int *skipWordCount_B, int *readWordCount_B,
-                                int numBits_B, FFTSampleBuffer *ptr2Buffer_B, int *currentChan_B,bool* isFirst_B )
+                                int numBits_B, FFTSampleBuffer *ptr2Buffer_B, int *currentChan_B,bool* isFirst_B,bool hasB )
 {
     quint32 bufferWord_A[3];
     quint32 syncWord_A[2];
@@ -626,7 +628,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
             if (inputStreamPtr_A->readRawData((char *)bufferWord_A,4)<4)
             {
                 usleep(1000*1000);
-                qWarning()<<"no data";
+                qWarning()<<"no data in A";
                 return 1;
             }
         }
@@ -658,14 +660,14 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
         ptr2Buffer_A->reserve(BUFFER_SIZE);
     }
 
-    if (*isFirst_B)
+    if (*isFirst_B && hasB)
     {
         while ((bufferWord_B[0]!=0x11111111)&&(bufferWord_B[0]!=0x22222222))
         {
             if (inputStreamPtr_B->readRawData((char *)bufferWord_B,4)<4)
             {
                 usleep(1000*1000);
-                qWarning()<<"no data";
+                qWarning()<<"no data in B";
                 return 1;
             }
         }
@@ -697,7 +699,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
         ptr2Buffer_B->reserve(BUFFER_SIZE);
     }
 
-    while (!(endOfFile_A    &&  endOfFile_B))
+    while (((!endOfFile_A)|((!endOfFile_B) && (hasB))) && isAlive)
     {
         if (!(endOfFile_A))
         {
@@ -765,7 +767,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
 
         }
         /**********for .b.gns file********/
-        if (!endOfFile_B)
+        if ((!endOfFile_B) && (hasB))
         {
             if ((fpgaSel==1)&&(skipWordCount_B[0]==skipWordCount_B[1]))
             {
@@ -955,6 +957,7 @@ void RTReadingThread::onTimeOut()
         if (fftBufferA.length()>1)
         {
             emit sendFFTSamples(fftBufferA.first(),attr.numBits[0],strategy==ST_SETUP);
+            saveToTxt(fftBufferA.first(),attr.numBits[0]);
             fftBufferA.removeFirst();
             fftBufferA.reserve(BUFFER_SIZE);
             //qWarning()<<"sample sent A";
@@ -967,12 +970,33 @@ void RTReadingThread::onTimeOut()
         if (fftBufferB.length()>1)
         {
             emit sendFFTSamples(fftBufferB.first(),attr.numBits[2],strategy==ST_SETUP);
+            saveToTxt(fftBufferA.first(),attr.numBits[0]);
             fftBufferB.removeFirst();
             fftBufferB.reserve(BUFFER_SIZE);
             //qWarning()<<"sample sent B";
         }
         mutex.unlock();
     }
+}
+
+int RTReadingThread::saveToTxt(FFTSamples samples, int numOfBits)
+{
+    QFile samplePool("/tmp/IFsample.txt");
+    if (!samplePool.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+             return 0;
+    QTextStream writeStream(&samplePool);
+    writeStream.setCodec("UTF-16");
+    writeStream.setGenerateByteOrderMark(true);
+    writeStream<<"_C"<<QString::number(samples.chan);
+    writeStream<<"_B"<<QString::number(numOfBits);
+    writeStream<<"\r\n";
+    writeStream<<"_V";
+    for (int i=0;i<32768;i++)
+    {
+        writeStream<<QChar(samples.valuesI[i]+32768)<<QChar(samples.valuesQ[i]+32768);
+    }
+    samplePool.close();
+    return 1;
 }
 
 int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanSel,quint32 *bufferWord,int *currentChan)
@@ -1285,7 +1309,7 @@ int RTReadingThread::isReplaying()
 
 int RTReadingThread::isSetupMode()
 {
-    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-J");
+    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-q");
     if (!pollingProc->waitForFinished())
         return -1;
     QString mode = pollingProc->readAll();

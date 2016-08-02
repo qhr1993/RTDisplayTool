@@ -66,6 +66,7 @@ public:
     QCustomPlot *widget;
     QVBoxLayout *verticalLayout_6;
     QHBoxLayout *horizontalLayout_2;
+    QPushButton *pushButton_3;
     QSpacerItem *horizontalSpacer;
     QPushButton *pushButton_6;
     QPushButton *pushButton_5;
@@ -87,6 +88,7 @@ public:
     QCustomPlot *widget_2;
     QVBoxLayout *verticalLayout_8;
     QHBoxLayout *horizontalLayout_5;
+    QPushButton *pushButton_10;
     QSpacerItem *horizontalSpacer_3;
     QPushButton *pushButton_9;
     QPushButton *pushButton_7;
@@ -273,6 +275,11 @@ public:
         horizontalLayout_2->setSpacing(6);
         horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
         horizontalLayout_2->setSizeConstraint(QLayout::SetMinimumSize);
+        pushButton_3 = new QPushButton(tab_2);
+        pushButton_3->setObjectName(QString::fromUtf8("pushButton_3"));
+
+        horizontalLayout_2->addWidget(pushButton_3);
+
         horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_2->addItem(horizontalSpacer);
@@ -388,6 +395,11 @@ public:
         horizontalLayout_5 = new QHBoxLayout();
         horizontalLayout_5->setSpacing(6);
         horizontalLayout_5->setObjectName(QString::fromUtf8("horizontalLayout_5"));
+        pushButton_10 = new QPushButton(tab_3);
+        pushButton_10->setObjectName(QString::fromUtf8("pushButton_10"));
+
+        horizontalLayout_5->addWidget(pushButton_10);
+
         horizontalSpacer_3 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_5->addItem(horizontalSpacer_3);
@@ -460,7 +472,7 @@ public:
 
         retranslateUi(MainWindow);
 
-        tabWidget->setCurrentIndex(1);
+        tabWidget->setCurrentIndex(2);
 
 
         QMetaObject::connectSlotsByName(MainWindow);
@@ -505,6 +517,7 @@ public:
          << QApplication::translate("MainWindow", "4", 0, QApplication::UnicodeUTF8)
          << QApplication::translate("MainWindow", "2", 0, QApplication::UnicodeUTF8)
         );
+        pushButton_3->setText(QApplication::translate("MainWindow", "Auto Scale", 0, QApplication::UnicodeUTF8));
         pushButton_6->setText(QApplication::translate("MainWindow", "Capture", 0, QApplication::UnicodeUTF8));
         pushButton_5->setText(QApplication::translate("MainWindow", "Freeze", 0, QApplication::UnicodeUTF8));
         pushButton_4->setText(QApplication::translate("MainWindow", "Resume", 0, QApplication::UnicodeUTF8));
@@ -531,6 +544,7 @@ public:
          << QApplication::translate("MainWindow", "4", 0, QApplication::UnicodeUTF8)
          << QApplication::translate("MainWindow", "2", 0, QApplication::UnicodeUTF8)
         );
+        pushButton_10->setText(QApplication::translate("MainWindow", "Auto Scale", 0, QApplication::UnicodeUTF8));
         pushButton_9->setText(QApplication::translate("MainWindow", "Capture", 0, QApplication::UnicodeUTF8));
         pushButton_7->setText(QApplication::translate("MainWindow", "Freeze", 0, QApplication::UnicodeUTF8));
         pushButton_8->setText(QApplication::translate("MainWindow", "Resume", 0, QApplication::UnicodeUTF8));
