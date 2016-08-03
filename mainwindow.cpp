@@ -123,7 +123,7 @@ void MainWindow::on_pushButton_clicked()
     else
         readingThread->setFPGASel(1);
     readingThread->isAlive=true;
-    readingThread->start(QThread::HighPriority);
+    readingThread->start(QThread::NormalPriority);
     frameCount=0;
     if (readingThread->isRunning())
     {
