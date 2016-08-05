@@ -72,6 +72,21 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->widget_2->xAxis->grid()->setVisible(false);
     ui->widget_2->yAxis->setRange(0,32767);
 
+//    QCPItemText *textTime1 = new QCPItemText(ui->widget);
+//    QCPItemText *textChan1 = new QCPItemText(ui->widget);
+//    QCPItemText *textTime2 = new QCPItemText(ui->widget_2);
+//    QCPItemText *textChan2 = new QCPItemText(ui->widget_2);
+//    ui->widget->addItem(textTime1);
+//    ui->widget->addItem(textChan1);
+//    ui->widget_2->addItem(textTime2);
+//    ui->widget_2->addItem(textChan2);
+//    textTime1->position->setCoords(1575,100);
+//    textChan1->position->setCoords(1600,300);
+//    textChan1->setText("chan");
+//    textTime1->setText("time");
+
+
+
     frameCount=0;
     currentChan=-1;
     currentHistoBd=-1;
@@ -83,6 +98,12 @@ MainWindow::MainWindow(QWidget *parent) :
     cursorEnabled=true;
 
     readingThread->setGNSFilePath("/home/spirent/Data");
+    QDir tmpSpe("/tmp/img_buffer_spe");
+    if (!tmpSpe.exists())
+        QDir("/tmp").mkdir("/tmp/img_buffer_spe");
+    QDir tmpHis("/tmp/img_buffer_his");
+    if (!tmpHis.exists())
+        QDir("/tmp").mkdir("/tmp/img_buffer_his");
 }
 
 MainWindow::~MainWindow()
@@ -219,7 +240,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         specBdFactor= pow(2,16-currentSpecBd);
         histoBdFactor = pow(2,16-currentHistoBd);
     }
-    qWarning()<<samples.valuesI[0]<<samples.valuesI[1]<<samples.valuesI[2]<<samples.valuesI[3]<<samples.valuesI[4];
+    //qWarning()<<samples.valuesI[0]<<samples.valuesI[1]<<samples.valuesI[2]<<samples.valuesI[3]<<samples.valuesI[4];
 
     if (newFlag)
     {
@@ -290,7 +311,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         else
             xScale[i]=((double)i-32768)/16384*xLimit + xCentre;
         //outMagLog[i]=10*log10(sqrt(((out[i+1][0])*(out[i+1][0])+(out[i+1][1])*(out[i+1][1]))/2));
-        outMagLog[i]=(sqrt(((out[i][0])*(out[i][0])+(out[i][1])*(out[i][1]))/2));
+        outMagLog[i]=(sqrt(((out[i][1])*(out[i][1]))/2));
     }
     fftw_destroy_plan(p);
     fftw_free(in); fftw_free(out);
@@ -325,6 +346,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         ui->widget->graph(0)->setData(xScale, tmpSpectrumSamples);
         ui->widget->replot();
         ui->label_3->setText(QString::number((double)frameCount/5.0,'f',1));
+        //----
     }
     if (isHistoShown)
     {
@@ -338,7 +360,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     //qWarning()<<distribution;
     ui->label_4->setText(QString::number(samples.chan));
     ui->label_9->setText(QString::number(samples.chan));
-    if (newFlag)
+    if (newFlag | (frameCount%30==0))
     {
         ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
         ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
@@ -346,17 +368,35 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         ui->widget->yAxis->setRangeUpper(5+yMax);
         ui->widget_2->yAxis->setRangeLower(0);
         ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
+        removeDir("/tmp/img_buffer_spe");
+        removeDir("/tmp/img_buffer_his");
     }
+
+    QDir::setCurrent("/tmp/img_buffer_spe");
+    ui->widget->saveJpg(QTime::currentTime().toString("hhmmsszzz-SPE")+".jpg",400,300);
+    QDir::setCurrent("/tmp/img_buffer_his");
+    ui->widget_2->saveJpg(QTime::currentTime().toString("hhmmsszzz-HIS")+".jpg",400,300);
+    QDir::setCurrent("/tmp");
+    QFile statusInfo("statusInfo.txt");
+    statusInfo.open(QIODevice::WriteOnly|QIODevice::Truncate);
+    QTextStream statusInfoStream(&statusInfo);
+    statusInfoStream<<"<signal>"<<readingThread->attr.signal[currentChan-1]<<"</signal>";
+    statusInfoStream<<"<bandwidth>"<<QString::number(readingThread->attr.bw[currentChan-1])<<"</bandwidth>";
+    statusInfoStream<<"<bitdepth>"<<QString::number(readingThread->attr.numBits[currentChan-1])<<"</bitdepth>";
+    statusInfoStream<<"<freq>"<<QString::number((double)readingThread->attr.freq[currentChan-1]*1.023,'f',2)<<"</freq>";
+    statusInfoStream<<"<time>"<<QString::number((double)frameCount/5.0,'f',1)<<"</time>";
+    statusInfo.close();
+    QDir::setCurrent("/home/spirent/Projects/RTDisplayTool");
 }
 
 void MainWindow::on_pushButton_6_clicked()
 {
-    ui->widget->savePng(QTime::currentTime().toString("hhmmsszzz-SPE")+".png",800,480);
+    ui->widget->saveJpg(QTime::currentTime().toString("hhmmsszzz-SPE")+".jpg",800,480);
 }
 
 void MainWindow::on_pushButton_9_clicked()
 {
-    ui->widget_2->savePng(QTime::currentTime().toString("hhmmsszzz-HIS")+".png",800,480);
+    ui->widget_2->saveJpg(QTime::currentTime().toString("hhmmsszzz-HIS")+".jpg",800,480);
 }
 
 void MainWindow::onXAxisRangeChanged(QCPRange newRange,QCPRange oldRange)
@@ -513,4 +553,31 @@ void MainWindow::on_pushButton_10_clicked()
 {
     ui->widget_2->yAxis->setRangeLower(0);
     ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
+}
+
+
+bool MainWindow::removeDir(const QString & dirName)
+{
+    bool result = true;
+    QDir dir(dirName);
+    if (dir.exists())
+    {
+        Q_FOREACH(QFileInfo info, dir.entryInfoList(QDir::NoDotAndDotDot | QDir::System | QDir::Hidden  | QDir::AllDirs | QDir::Files, QDir::DirsFirst))
+        {
+            if (info.isDir())
+            {
+                result = removeDir(info.absoluteFilePath());
+            }
+            else
+            {
+                result = QFile::remove(info.absoluteFilePath());
+            }
+
+            if (!result)
+            {
+                return result;
+            }
+        }
+    }
+    return result;
 }

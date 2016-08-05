@@ -42,6 +42,7 @@ private:
     void manageCursor(QCustomPlot *customPlot, QCPCursor *cursor, double x, double y, QPen pen);
     bool cursorEnabled;
     double xLimit,xCentre,y2Max,yMax,yMin;
+    bool removeDir(const QString & dirName);
     Ui::MainWindow *ui;
     Attributes attri;
 private slots:

@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <sys/file.h>
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 25
 #define TIMER_MSEC 200
 #define REVSTR "RECORDING"
 #define RPLSTR "PLAYING"
@@ -598,7 +598,7 @@ int RTReadingThread::getInitialData(QFileInfo targetFile,int *syncMode,int *skip
         else
         {
             endOfFile=true;
-            qWarning()<<"end of file: @"<<skipWordCount[0]<<" of "<<skipWordCount[1];
+            //qWarning()<<"end of file: @"<<skipWordCount[0]<<" of "<<skipWordCount[1];
         }
     }
     tmpFile.close();
@@ -706,11 +706,12 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
         {
             if ((fpgaSel==0)&&(skipWordCount_A[0]==skipWordCount_A[1]))
             {
+                int iChannelSel=channelSel;
                 while (readWordCount_A[0])
                 {
                     if (is12Bits_A)
                     {
-                        if (!readWords12(inputStreamPtr_A,*syncMode_A,channelSel,bufferWord_A,currentChan_A))
+                        if (!readWords12(inputStreamPtr_A,*syncMode_A,iChannelSel,bufferWord_A,currentChan_A))
                         {
                             endOfFile_A=true;
                             return 1;
@@ -718,7 +719,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                     }
                     else
                     {
-                        if (!readWords(inputStreamPtr_A,*syncMode_A,channelSel,bufferWord_A,currentChan_A))
+                        if (!readWords(inputStreamPtr_A,*syncMode_A,iChannelSel,bufferWord_A,currentChan_A))
                         {
                             endOfFile_A=true;
                             return 1;
@@ -737,7 +738,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                         currentFFTSamples.valuesI[32768-(readWordCount_A[0])*32/(2*numBits_A)+i]=sampleIFromWord[i];
                         currentFFTSamples.valuesQ[32768-(readWordCount_A[0])*32/(2*numBits_A)+i]=sampleQFromWord[i];
                     }
-                    currentFFTSamples.chan=(int)fpgaSel*2+(int)channelSel+1;
+                    currentFFTSamples.chan=(int)iChannelSel+1;
                     (readWordCount_A[0])--;
                     (skipWordCount_A[0])--;
                 }
@@ -748,7 +749,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                 if ((ptr2Buffer_A->length()==BUFFER_SIZE)&&(strategy==ST_RECORD))
                     ptr2Buffer_A->removeFirst();
                 ptr2Buffer_A->append(currentFFTSamples);
-                //qWarning()<<"new appeneded";
+                qWarning()<<"new appeneded";
                 mutex.unlock();
             }
 
@@ -772,11 +773,12 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
         {
             if ((fpgaSel==1)&&(skipWordCount_B[0]==skipWordCount_B[1]))
             {
+                int iChannelSel=channelSel;
                 while (readWordCount_B[0])
                 {
                     if (is12Bits_B)
                     {
-                        if (!readWords12(inputStreamPtr_B,*syncMode_B,channelSel,bufferWord_B,currentChan_B))
+                        if (!readWords12(inputStreamPtr_B,*syncMode_B,iChannelSel,bufferWord_B,currentChan_B))
                         {
                             endOfFile_B=true;
                             return 1;
@@ -784,7 +786,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                     }
                     else
                     {
-                        if (!readWords(inputStreamPtr_B,*syncMode_B,channelSel,bufferWord_B,currentChan_B))
+                        if (!readWords(inputStreamPtr_B,*syncMode_B,iChannelSel,bufferWord_B,currentChan_B))
                         {
                             endOfFile_B=true;
                             return 1;
@@ -803,7 +805,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                         currentFFTSamples.valuesI[32768-(readWordCount_B[0])*32/(2*numBits_B)+i]=sampleIFromWord[i];
                         currentFFTSamples.valuesQ[32768-(readWordCount_B[0])*32/(2*numBits_B)+i]=sampleQFromWord[i];
                     }
-                    currentFFTSamples.chan=(int)fpgaSel*2+(int)channelSel+1;
+                    currentFFTSamples.chan=2+(int)iChannelSel+1;
                     (readWordCount_B[0])--;
                     (skipWordCount_B[0])--;
                 }
@@ -958,7 +960,7 @@ void RTReadingThread::onTimeOut()
         if (fftBufferA.length()>1)
         {
             emit sendFFTSamples(fftBufferA.first(),attr.numBits[0],strategy==ST_SETUP);
-            saveToTxt(fftBufferA.first(),attr.numBits[0]);
+            //saveToTxt(fftBufferA.first(),attr.numBits[0]);
             fftBufferA.removeFirst();
             fftBufferA.reserve(BUFFER_SIZE);
             //qWarning()<<"sample sent A";
@@ -971,7 +973,7 @@ void RTReadingThread::onTimeOut()
         if (fftBufferB.length()>1)
         {
             emit sendFFTSamples(fftBufferB.first(),attr.numBits[2],strategy==ST_SETUP);
-            saveToTxt(fftBufferA.first(),attr.numBits[0]);
+            //saveToTxt(fftBufferA.first(),attr.numBits[0]);
             fftBufferB.removeFirst();
             fftBufferB.reserve(BUFFER_SIZE);
             //qWarning()<<"sample sent B";
@@ -982,23 +984,42 @@ void RTReadingThread::onTimeOut()
 
 int RTReadingThread::saveToTxt(FFTSamples samples, int numOfBits)
 {
-//    QFile samplePool("/tmp/IFsample.txt");
-//    if (!samplePool.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
-//             return 0;
-//    QTextStream writeStream(&samplePool);
-//    //writeStream.setCodec("UTF-16");
-//    //writeStream.setGenerateByteOrderMark(true);
-//    writeStream<<"_C"<<QString::number(samples.chan);
-//    writeStream<<"_B"<<QString::number(numOfBits);
-//    writeStream<<"\r\n";
-//    writeStream<<"_V";
-//    for (int i=0;i<32768;i++)
-//    {
-//        writeStream<<QChar((samples.valuesI[i]+32768)/256)<<QChar((samples.valuesI[i]+32768)%256)
-//                  <<QChar((samples.valuesQ[i]+32768)/256)<<QChar((samples.valuesI[i]+32768)%256);
-//    }
-//    samplePool.close();
-//    return 1;
+    QFile samplePool("/tmp/IFsample.txt");
+    if (!samplePool.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+             return 0;
+    QTextStream writeStream(&samplePool);
+    writeStream.setCodec("UTF-16");
+    writeStream.setGenerateByteOrderMark(true);
+    writeStream<<"_C"<<QString::number(samples.chan);
+    writeStream<<"_B"<<QString::number(numOfBits);
+    writeStream<<"\r\n";
+    writeStream<<"_V";
+    for (int i=0;i<32768;i++)
+    {
+        if ((samples.valuesI[i]+32768)<0x0021)
+            writeStream<<QChar(samples.valuesI[i]+32768+67328);
+        else if ((samples.valuesI[i]+32768)>0xFFFD)
+            writeStream<<QChar(samples.valuesI[i]+32768+2);
+        else if (((samples.valuesI[i]+32768)>=0xFDD0) && (((samples.valuesI[i]+32768)<=0xFDEF) ))
+            writeStream<<QChar(samples.valuesI[i]+32768+12288);
+        else if (((samples.valuesI[i]+32768)>0xDFFF) | (((samples.valuesI[i]+32768)<0xD800) ))
+            writeStream<<QChar(samples.valuesI[i]+32768);
+        else
+            writeStream<<QChar(samples.valuesI[i]+32768+12288);
+
+        if ((samples.valuesQ[i]+32768)<0x0021)
+            writeStream<<QChar(samples.valuesQ[i]+32768+67328);
+        else if ((samples.valuesQ[i]+32768)>0xFFFD)
+            writeStream<<QChar(samples.valuesQ[i]+32768+2);
+        else if (((samples.valuesQ[i]+32768)>=0xFDD0) && (((samples.valuesQ[i]+32768)<=0xFDEF) ))
+            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
+        else if (((samples.valuesQ[i]+32768)>0xDFFF) | (((samples.valuesQ[i]+32768)<0xD800) ))
+            writeStream<<QChar(samples.valuesQ[i]+32768);
+        else
+            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
+    }
+    samplePool.close();
+    return 1;
 }
 
 int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanSel,quint32 *bufferWord,int *currentChan)
