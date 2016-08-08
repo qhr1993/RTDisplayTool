@@ -41,10 +41,8 @@ public:
     QVBoxLayout *verticalLayout_3;
     QHBoxLayout *horizontalLayout;
     QLabel *label_13;
-    QComboBox *comboBox_5;
+    QLabel *label_14;
     QSpacerItem *horizontalSpacer_7;
-    QPushButton *pushButton;
-    QPushButton *pushButton_2;
     QHBoxLayout *horizontalLayout_3;
     QTextBrowser *textBrowser;
     QGroupBox *groupBox;
@@ -128,25 +126,14 @@ public:
 
         horizontalLayout->addWidget(label_13);
 
-        comboBox_5 = new QComboBox(tab);
-        comboBox_5->setObjectName(QString::fromUtf8("comboBox_5"));
+        label_14 = new QLabel(tab);
+        label_14->setObjectName(QString::fromUtf8("label_14"));
 
-        horizontalLayout->addWidget(comboBox_5);
+        horizontalLayout->addWidget(label_14);
 
         horizontalSpacer_7 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout->addItem(horizontalSpacer_7);
-
-        pushButton = new QPushButton(tab);
-        pushButton->setObjectName(QString::fromUtf8("pushButton"));
-
-        horizontalLayout->addWidget(pushButton);
-
-        pushButton_2 = new QPushButton(tab);
-        pushButton_2->setObjectName(QString::fromUtf8("pushButton_2"));
-        pushButton_2->setEnabled(false);
-
-        horizontalLayout->addWidget(pushButton_2);
 
 
         verticalLayout_3->addLayout(horizontalLayout);
@@ -472,7 +459,7 @@ public:
 
         retranslateUi(MainWindow);
 
-        tabWidget->setCurrentIndex(2);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(MainWindow);
@@ -482,14 +469,7 @@ public:
     {
         MainWindow->setWindowTitle(QApplication::translate("MainWindow", "Read-Time Display Tool", 0, QApplication::UnicodeUTF8));
         label_13->setText(QApplication::translate("MainWindow", "Mode", 0, QApplication::UnicodeUTF8));
-        comboBox_5->clear();
-        comboBox_5->insertItems(0, QStringList()
-         << QApplication::translate("MainWindow", "SETUP", 0, QApplication::UnicodeUTF8)
-         << QApplication::translate("MainWindow", "RECORD", 0, QApplication::UnicodeUTF8)
-         << QApplication::translate("MainWindow", "REPLAY", 0, QApplication::UnicodeUTF8)
-        );
-        pushButton->setText(QApplication::translate("MainWindow", "Start", 0, QApplication::UnicodeUTF8));
-        pushButton_2->setText(QApplication::translate("MainWindow", "Stop", 0, QApplication::UnicodeUTF8));
+        label_14->setText(QApplication::translate("MainWindow", "---", 0, QApplication::UnicodeUTF8));
         groupBox->setTitle(QApplication::translate("MainWindow", "Signal Selection", 0, QApplication::UnicodeUTF8));
         radioButton->setText(QApplication::translate("MainWindow", "Signal 1", 0, QApplication::UnicodeUTF8));
         radioButton_2->setText(QApplication::translate("MainWindow", "Signal 2", 0, QApplication::UnicodeUTF8));

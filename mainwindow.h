@@ -47,11 +47,8 @@ private:
     Ui::MainWindow *ui;
     Attributes attri;
 private slots:
-    void on_pushButton_clicked();
     void onHeaderRcvd(QString header);
     void onAttrRcvd(Attributes attr);
-
-    void on_pushButton_2_clicked();
 
     void onThreadTerminated();
     void onChannelSelChanged(int id);
@@ -78,6 +75,7 @@ private slots:
     void onSignalError();
     void on_pushButton_3_clicked();
     void on_pushButton_10_clicked();
+    void onInitialisation();
 };
 
 #endif // MAINWINDOW_H

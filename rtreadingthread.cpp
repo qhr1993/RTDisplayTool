@@ -53,23 +53,26 @@ void RTReadingThread::run()
     fftBufferB.reserve(BUFFER_SIZE);
     timer->start(TIMER_MSEC);
 
-//    while (isStopped())
-//    {
-//        qWarning()<<"mode: STOPPED";
-//    }
-//    isAlive=true;
+    while (isStopped())
+    {
+        qWarning()<<"mode: STOPPED";
+    }
 
-//    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
-//    if (!pollingProc->waitForFinished())
-//        return 0;
-//    QString mode = pollingProc->readAll();
-//    mode = mode.split(" ").at(1);
-//    if (mode==RPLSTR)
-//        strategy=ST_REPLAY;
-//    else if ((mode==REVSTR) && (isSetupMode()))
-//        strategy=ST_SETUP;
-//    else
-//        strategy=ST_RECORD;
+
+    isAlive=true;
+
+    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
+    if (!pollingProc->waitForFinished())
+        return;
+    QString mode = pollingProc->readAll();
+    mode = mode.split(" ").at(1);
+    if (mode==RPLSTR)
+        strategy=ST_REPLAY;
+    else if ((mode==REVSTR) && (isSetupMode()))
+        strategy=ST_SETUP;
+    else
+        strategy=ST_RECORD;
+    emit initToUi();
 
     while (isAlive)
     {
@@ -1367,7 +1370,7 @@ int RTReadingThread::isReplaying()
 
 int RTReadingThread::isSetupMode()
 {
-    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-q");
+    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-K");
     if (!pollingProc->waitForFinished())
         return -1;
     QString mode = pollingProc->readAll();

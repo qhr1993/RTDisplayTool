@@ -90,6 +90,7 @@ signals:
     void threadTerminated();
     void sendFFTSamples(FFTSamples samples,int numOfBits,bool isSetup);
     void signalError();
+    void initToUi();
 private slots:
     void onTimeOut();
 };

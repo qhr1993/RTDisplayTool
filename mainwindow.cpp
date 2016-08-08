@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QSharedMemory>
 #include "math.h"
+#include <unistd.h>
 
 #define YMAX 40*1.023
 #define BITDEPTH_MAX 8
@@ -26,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->widget->yAxis,SIGNAL(rangeChanged(QCPRange,QCPRange)),this,SLOT(onYAxisRangeChanged(QCPRange,QCPRange)));
     connect(ui->widget_2->yAxis,SIGNAL(rangeChanged(QCPRange,QCPRange)),this,SLOT(on2YAxisRangeChanged(QCPRange,QCPRange)));
     connect(readingThread,SIGNAL(signalError()),this,SLOT(onSignalError()));
+    connect(readingThread,SIGNAL(initToUi()),this,SLOT(onInitialisation()));
 
     ui->buttonGroup->setId(ui->radioButton,0);
     ui->buttonGroup->setId(ui->radioButton_2,1);
@@ -105,6 +107,11 @@ MainWindow::MainWindow(QWidget *parent) :
     QDir tmpHis("/tmp/img_buffer_his");
     if (!tmpHis.exists())
         QDir("/tmp").mkdir("/tmp/img_buffer_his");
+
+    readingThread->setRamDiskPath("/run/shm");
+
+    readingThread->start(QThread::NormalPriority);
+    frameCount=0;
 }
 
 MainWindow::~MainWindow()
@@ -115,20 +122,11 @@ MainWindow::~MainWindow()
     delete readingThread;
 }
 
-
-void MainWindow::on_pushButton_clicked()
+void MainWindow::onInitialisation()
 {
-    int stra = ui->comboBox_5->currentIndex();
-    readingThread->setRamDiskPath("/run/shm");
     readingThread->setChannel(ui->buttonGroup->checkedId());
     readingThread->resetSync();
-    switch (stra)
-    {
-        case 0:   readingThread->strategy=ST_SETUP;   break;
-        case 1:  readingThread->strategy=ST_RECORD;  break;
-        case 2:  readingThread->strategy=ST_REPLAY; break;
-        default: readingThread->strategy=ST_NULL;break;
-    }
+
     if (readingThread->strategy!=ST_SETUP)
     {
         ui->comboBox_3->setDisabled(true);
@@ -140,24 +138,19 @@ void MainWindow::on_pushButton_clicked()
         ui->comboBox_4->setDisabled(false);
     }
 
+    switch (readingThread->strategy)
+    {
+    qWarning()<<readingThread->strategy;
+    case ST_RECORD: ui->label_14->setText("<b>RECORDING</b>"); break;
+    case ST_REPLAY: ui->label_14->setText("<b>REPLAYING</b>"); break;
+    case ST_SETUP: ui->label_14->setText("<b>SETUP</b>"); break;
+    default: ui->label_14->setText("---");break;
+    }
+
     if (ui->buttonGroup->checkedId()<2)
         readingThread->setFPGASel(0);
     else
         readingThread->setFPGASel(1);
-    readingThread->isAlive=true;
-    readingThread->start(QThread::NormalPriority);
-    frameCount=0;
-    if (readingThread->isRunning())
-    {
-        ui->pushButton_2->setEnabled(true);
-        ui->pushButton->setDisabled(true);
-        ui->comboBox_5->setDisabled(true);
-    }
-}
-
-void MainWindow::on_pushButton_2_clicked()
-{
-    readingThread->isAlive=false;
 }
 
 void MainWindow::onHeaderRcvd(QString header)
@@ -202,17 +195,30 @@ void MainWindow::onThreadTerminated()
     readingThread->wait();
     if (!readingThread->isRunning())
     {
-        ui->pushButton->setEnabled(true);
-        ui->pushButton_2->setDisabled(true);
         ui->radioButton->setEnabled(false);
         ui->radioButton_2->setEnabled(false);
         ui->radioButton_3->setEnabled(false);
         ui->radioButton_4->setEnabled(false);
         ui->radioButton->setChecked(true);
-        ui->comboBox_5->setEnabled(true);
         ui->comboBox_4->setDisabled(true);
         ui->comboBox_3->setDisabled(true);
     }
+    ui->textBrowser->clear();
+    ui->label_14->setText("---");
+    ui->treeWidget->clear();
+    ui->label_3->setText("--");
+    ui->label_4->setText("-");
+    ui->label_10->setText("--");
+    ui->label_9->setText("-");
+    ui->radioButton->setEnabled(true);
+    ui->radioButton_2->setEnabled(true);
+    ui->radioButton_3->setEnabled(true);
+    ui->radioButton_4->setEnabled(true);
+
+
+    usleep(1000*10);
+
+    readingThread->start(QThread::HighPriority);
 }
 
 void MainWindow::onChannelSelChanged(int id)
