@@ -82,6 +82,7 @@ private:
     void clearRamDisk();
     bool removeDir(const QString & dirName);
     int isSetupMode();
+    int isStopped();
     int saveToTxt(FFTSamples samples,int numOfBits);
 signals:
     void dispHeader(QString header);

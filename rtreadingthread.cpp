@@ -6,10 +6,11 @@
 #include <unistd.h>
 #include <sys/file.h>
 
-#define BUFFER_SIZE 25
+#define BUFFER_SIZE 50
 #define TIMER_MSEC 200
 #define REVSTR "RECORDING"
 #define RPLSTR "PLAYING"
+#define STPSTR "STOPPED"
 
 RTReadingThread::RTReadingThread(QObject *parent):QThread(parent)
 {
@@ -51,6 +52,24 @@ void RTReadingThread::run()
     fftBufferA.reserve(BUFFER_SIZE);
     fftBufferB.reserve(BUFFER_SIZE);
     timer->start(TIMER_MSEC);
+
+//    while (isStopped())
+//    {
+//        qWarning()<<"mode: STOPPED";
+//    }
+//    isAlive=true;
+
+//    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
+//    if (!pollingProc->waitForFinished())
+//        return 0;
+//    QString mode = pollingProc->readAll();
+//    mode = mode.split(" ").at(1);
+//    if (mode==RPLSTR)
+//        strategy=ST_REPLAY;
+//    else if ((mode==REVSTR) && (isSetupMode()))
+//        strategy=ST_SETUP;
+//    else
+//        strategy=ST_RECORD;
 
     while (isAlive)
     {
@@ -126,6 +145,7 @@ void RTReadingThread::run()
     bool isFirstGNSA = true,isFirstGNSB = true;
     while(isAlive)
     {
+        if (isStopped()) break;
         if (strategy==ST_SETUP)
         {
             bool isRecordingReg = ((isRecording()) && (isSetupMode()));
@@ -700,8 +720,10 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
         ptr2Buffer_B->reserve(BUFFER_SIZE);
     }
 
-    while (((!endOfFile_A)|((!endOfFile_B) && (hasB))) && isAlive)
+    while ((!endOfFile_A)|((!endOfFile_B) && (hasB)))
     {
+        if (!isAlive) break;
+        if (isStopped()) break;
         if (!(endOfFile_A))
         {
             if ((fpgaSel==0)&&(skipWordCount_A[0]==skipWordCount_A[1]))
@@ -744,7 +766,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                 }
 
                 while ((ptr2Buffer_A->length()==BUFFER_SIZE)&&(strategy==ST_REPLAY))
-                    msleep(200);
+                    msleep(100);
                 mutex.lock();
                 if ((ptr2Buffer_A->length()==BUFFER_SIZE)&&(strategy==ST_RECORD))
                     ptr2Buffer_A->removeFirst();
@@ -1312,6 +1334,19 @@ int RTReadingThread::isRecording()
     QString mode = pollingProc->readAll();
     mode = mode.split(" ").at(1);
     if (mode==REVSTR)
+        return 1;
+    else
+        return 0;
+}
+
+int RTReadingThread::isStopped()
+{
+    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
+    if (!pollingProc->waitForFinished())
+        return 0;
+    QString mode = pollingProc->readAll();
+    mode = mode.split(" ").at(1);
+    if (mode==STPSTR)
         return 1;
     else
         return 0;

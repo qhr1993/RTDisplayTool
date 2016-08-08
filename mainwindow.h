@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QSharedMemory>
 #include "rtreadingthread.h"
 #include "qcustomplot.h"
 

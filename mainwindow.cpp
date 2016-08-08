@@ -4,6 +4,7 @@
 #include <QTreeWidgetItem>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QSharedMemory>
 #include "math.h"
 
 #define YMAX 40*1.023
@@ -189,6 +190,10 @@ void MainWindow::onAttrRcvd(Attributes attr)
             //qWarning()<<"singals: "<<ui->buttonGroup->buttons().length();
             ui->buttonGroup->button(i)->setEnabled(true);
         }
+        else
+        {
+            ui->buttonGroup->button(i)->setEnabled(false);
+        }
     }
 }
 
@@ -362,8 +367,6 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     ui->label_9->setText(QString::number(samples.chan));
     if (newFlag | (frameCount%30==0))
     {
-        ui->widget->xAxis->setRangeLower(-1*xLimit+xCentre);
-        ui->widget->xAxis->setRangeUpper(xLimit+xCentre);
         ui->widget->yAxis->setRangeLower(-5+yMin);
         ui->widget->yAxis->setRangeUpper(5+yMax);
         ui->widget_2->yAxis->setRangeLower(0);
