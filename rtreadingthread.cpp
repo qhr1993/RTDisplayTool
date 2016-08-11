@@ -8,6 +8,7 @@
 
 #define BUFFER_SIZE 50
 #define TIMER_MSEC 200
+#define PRELOAD_SIZE 25
 #define REVSTR "RECORDING"
 #define RPLSTR "PLAYING"
 #define STPSTR "STOPPED"
@@ -32,9 +33,10 @@ RTReadingThread::RTReadingThread(QObject *parent):QThread(parent)
     currentChanA=-1;
     currentChanB=-1;
     strategy = ST_SETUP;
+    startFlag = false;
 
     attr.signal.resize(4);
-    timer = new QTimer(this);
+    timer = new QTimer();
     connect(timer, SIGNAL(timeout()), this, SLOT(onTimeOut()));
 }
 RTReadingThread::~RTReadingThread()
@@ -44,271 +46,273 @@ RTReadingThread::~RTReadingThread()
 
 void RTReadingThread::run()
 {
-    pollingProc = new QProcess(this);
-    fileSeqA=0;
-    fileSeqB=0;
-    fftBufferA.clear();
-    fftBufferB.clear();
-    fftBufferA.reserve(BUFFER_SIZE);
-    fftBufferB.reserve(BUFFER_SIZE);
-    timer->start(TIMER_MSEC);
-
-    while (isStopped())
+    while (1)
     {
-        qWarning()<<"mode: STOPPED";
-    }
-
-
-    isAlive=true;
-
-    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
-    if (!pollingProc->waitForFinished())
-        return;
-    QString mode = pollingProc->readAll();
-    mode = mode.split(" ").at(1);
-    if (mode==RPLSTR)
-        strategy=ST_REPLAY;
-    else if ((mode==REVSTR) && (isSetupMode()))
-        strategy=ST_SETUP;
-    else
-        strategy=ST_RECORD;
-    emit initToUi();
-
-    while (isAlive)
-    {
-        if (strategy==ST_SETUP)
+        pollingProc = new QProcess(this);
+        fileSeqA=0;
+        fileSeqB=0;
+        fftBufferA.clear();
+        fftBufferB.clear();
+        fftBufferA.reserve(BUFFER_SIZE);
+        fftBufferB.reserve(BUFFER_SIZE);
+        while (isStopped())
         {
-            if (!((isRecording())&&(isSetupMode())))
-                qWarning()<<"Not in setup mode" <<isRecording()<<isSetupMode();
-            else
-            {
-                QString fileNameRaw;
-                pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
-                if (!pollingProc->waitForFinished())
-                    return;
-                fileNameRaw = pollingProc->readAll();
-                fileName = fileNameRaw.mid(10).left(12);
-                currentFileA = QFileInfo(ramDiskPathA.absolutePath()+"/"+fileName+".000");
-                qWarning()<<"current file"<<currentFileA.absoluteFilePath();
-                qWarning()<<currentFileA.fileName();
-                currentFileB = QFileInfo(ramDiskPathB.absolutePath()+"/"+fileName+".000");
-                endFileA=QFileInfo(ramDiskPathA.absolutePath()+"/"+fileName+".end");
-                endFileB=QFileInfo(ramDiskPathB.absolutePath()+"/"+fileName+".end");
-                break;
-            }
+            //qWarning()<<"mode: STOPPED";
+            msleep(100);
         }
-        else if (strategy==ST_RECORD)
-        {
-            if (!((isRecording())&&(!(isSetupMode()))))
-                qWarning()<<"Not in recording mode" ;
-            else
-            {
-                QString fileNameRaw;
-                pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
-                if (!pollingProc->waitForFinished())
-                    return;
-                fileNameRaw = pollingProc->readAll();
-                fileName = fileNameRaw.mid(10).left(12);
-                currentFileA = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".A.gns");
-                qWarning()<<"current file"<<currentFileA.absoluteFilePath();
-                qWarning()<<currentFileA.fileName();
-                currentFileB = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".B.gns");
-                break;
-            }
-        }
-        else if (strategy==ST_REPLAY)
-        {
-            if (!(isReplaying()))
-                qWarning()<<"Not in replaying mode" ;
-            else
-            {
-                QString fileNameRaw;
-                pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
-                if (!pollingProc->waitForFinished())
-                    return;
-                fileNameRaw = pollingProc->readAll();
-                fileName = fileNameRaw.mid(10).left(12);
-                currentFileA = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".A.gns");
-                qWarning()<<"current file"<<currentFileA.absoluteFilePath();
-                qWarning()<<currentFileA.fileName();
-                currentFileB = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".B.gns");
-                break;
-            }
-        }
+
+        isAlive=true;
+        timer->start(TIMER_MSEC);
+        startFlag = false;
+
+        pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
+        if (!pollingProc->waitForFinished())
+            return;
+        QString mode = pollingProc->readAll();
+        mode = mode.split(" ").at(1);
+        if (mode==RPLSTR)
+            strategy=ST_REPLAY;
+        else if ((mode==REVSTR) && (isSetupMode()))
+            strategy=ST_SETUP;
         else
-        {
-            qWarning()<<"Error: State Error" ;
-        }
-    }
+            strategy=ST_RECORD;
+        emit initToUi();
 
-    QFile gnsFileA(currentFileA.absoluteFilePath());
-    QFile gnsFileB(currentFileB.absoluteFilePath());
-    QDataStream inputStreamA(&gnsFileA);
-    QDataStream inputStreamB(&gnsFileB);
-    bool isFirstGNSA = true,isFirstGNSB = true;
-    while(isAlive)
-    {
-        if (isStopped()) break;
-        if (strategy==ST_SETUP)
+        while (isAlive)
         {
-            bool isRecordingReg = ((isRecording()) && (isSetupMode()));
-           // qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
-            //<<isRecordingReg;
-            //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isRecordingReg;
-            if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isRecordingReg)
+            if (strategy==ST_SETUP)
             {
-                if (fileSeqA==0)
+                if (!((isRecording())&&(isSetupMode())))
+                    qWarning()<<"Not in setup mode" <<isRecording()<<isSetupMode();
+                else
                 {
-                    if (!getHeader())
+                    QString fileNameRaw;
+                    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
+                    if (!pollingProc->waitForFinished())
+                        return;
+                    fileNameRaw = pollingProc->readAll();
+                    fileName = fileNameRaw.mid(10).left(12);
+                    currentFileA = QFileInfo(ramDiskPathA.absolutePath()+"/"+fileName+".000");
+                    qWarning()<<"current file"<<currentFileA.absoluteFilePath();
+                    qWarning()<<currentFileA.fileName();
+                    currentFileB = QFileInfo(ramDiskPathB.absolutePath()+"/"+fileName+".000");
+                    endFileA=QFileInfo(ramDiskPathA.absolutePath()+"/"+fileName+".end");
+                    endFileB=QFileInfo(ramDiskPathB.absolutePath()+"/"+fileName+".end");
+                    break;
+                }
+            }
+            else if (strategy==ST_RECORD)
+            {
+                if (!((isRecording())&&(!(isSetupMode()))))
+                    qWarning()<<"Not in recording mode" ;
+                else
+                {
+                    QString fileNameRaw;
+                    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
+                    if (!pollingProc->waitForFinished())
+                        return;
+                    fileNameRaw = pollingProc->readAll();
+                    fileName = fileNameRaw.mid(10).left(12);
+                    currentFileA = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".A.gns");
+                    qWarning()<<"current file"<<currentFileA.absoluteFilePath();
+                    qWarning()<<currentFileA.fileName();
+                    currentFileB = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".B.gns");
+                    break;
+                }
+            }
+            else if (strategy==ST_REPLAY)
+            {
+                if (!(isReplaying()))
+                    qWarning()<<"Not in replaying mode" ;
+                else
+                {
+                    QString fileNameRaw;
+                    pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-f");
+                    if (!pollingProc->waitForFinished())
+                        return;
+                    fileNameRaw = pollingProc->readAll();
+                    fileName = fileNameRaw.mid(10).left(12);
+                    currentFileA = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".A.gns");
+                    qWarning()<<"current file"<<currentFileA.absoluteFilePath();
+                    qWarning()<<currentFileA.fileName();
+                    currentFileB = QFileInfo(gnsFile.absolutePath()+"/"+fileName+".B.gns");
+                    break;
+                }
+            }
+            else
+            {
+                qWarning()<<"Error: State Error" ;
+            }
+        }
+
+        QFile gnsFileA(currentFileA.absoluteFilePath());
+        QFile gnsFileB(currentFileB.absoluteFilePath());
+        QDataStream inputStreamA(&gnsFileA);
+        QDataStream inputStreamB(&gnsFileB);
+        bool isFirstGNSA = true,isFirstGNSB = true;
+        while(isAlive)
+        {
+            if (isStopped()) break;
+            if (strategy==ST_SETUP)
+            {
+                bool isRecordingReg = ((isRecording()) && (isSetupMode()));
+                // qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
+                //<<isRecordingReg;
+                //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isRecordingReg;
+                if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isRecordingReg)
+                {
+                    if (fileSeqA==0)
                     {
-                        qWarning()<<"Cannot open header.";
-                        break;
+                        if (!getHeader())
+                        {
+                            qWarning()<<"Cannot open header.";
+                            break;
+                        }
+                        if (attr.signal[(int)fpgaSel*2+(int)channelSel].isEmpty())
+                        {
+                            emit signalError();
+                            break;
+                        }
+
+                        if (!getInitialData(currentFileA,&syncModeA,skipWordCountA,
+                                            readWordCountA,attr.numBits[0],&fftBufferA,fpgaSel==0,channelSel,&currentChanA))
+                        {
+                            qWarning()<<"Cannot open .000.";
+                            break;
+                        }
+                    }
+                    else
+                        getData(currentFileA,&syncModeA,skipWordCountA,
+                                readWordCountA,attr.numBits[0],&fftBufferA,fpgaSel==0,channelSel,&currentChanA);
+
+                    toNextFile(&currentFileA,&fileSeqA);
+                }
+
+                if ((!attr.signal[2].isEmpty()))
+                {
+                    // qWarning()<<currentFileB.absoluteFilePath();
+                    if ((access(currentFileB.absoluteFilePath().toLatin1().data(),F_OK)+1) && isRecordingReg)
+                    {
+                        if (fileSeqB==0)
+                        {
+                            if (!getInitialData(currentFileB,&syncModeB,skipWordCountB,
+                                                readWordCountB,attr.numBits[2],&fftBufferB,fpgaSel==1,channelSel,&currentChanB))
+                            {
+                                qWarning()<<"Cannot open .000B.";
+                                break;
+                            }
+                        }
+                        else
+                            getData(currentFileB,&syncModeB,skipWordCountB,
+                                    readWordCountB,attr.numBits[2],&fftBufferB,fpgaSel==1,channelSel,&currentChanB);
+                        toNextFile(&currentFileB,&fileSeqB);
+                    }
+                }
+            }
+            else if (strategy==ST_RECORD)
+            {
+                bool isRecordingReg = ((isRecording()) && (!isSetupMode()));
+                //qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
+                //<<isRecordingReg;
+                //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isRecordingReg;
+                if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isRecordingReg)
+                {
+                    if (isFirstGNSA)
+                    {
+                        if (!getHeader())
+                        {
+                            qWarning()<<"Cannot open header.";
+                            break;
+                        }
                     }
                     if (attr.signal[(int)fpgaSel*2+(int)channelSel].isEmpty())
                     {
                         emit signalError();
                         break;
                     }
-
-                    if (!getInitialData(currentFileA,&syncModeA,skipWordCountA,
-                                        readWordCountA,attr.numBits[0],&fftBufferA,fpgaSel==0,channelSel,&currentChanA))
+                    if (!gnsFileA.isOpen())
                     {
-                        qWarning()<<"Cannot open .000.";
+                        qWarning()<<"access: "<<(access(currentFileA.absoluteFilePath().toLatin1().data(),R_OK)+1);
+                        qWarning()<<"open: "<<gnsFileA.open(QIODevice::ReadOnly);
+                    }
+                    if ((!gnsFileB.isOpen()) && (!attr.signal[2].isEmpty()))
+                    {
+                        qWarning()<<"access: "<<(access(currentFileB.absoluteFilePath().toLatin1().data(),R_OK)+1);
+                        qWarning()<<"open: "<<gnsFileB.open(QIODevice::ReadOnly);
+                    }
+                    if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
+                                    readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
+                                    &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
+                                    readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
+                    {
+                        qWarning()<<"Error";
                         break;
                     }
                 }
-                else
-                    getData(currentFileA,&syncModeA,skipWordCountA,
-                            readWordCountA,attr.numBits[0],&fftBufferA,fpgaSel==0,channelSel,&currentChanA);
-
-                toNextFile(&currentFileA,&fileSeqA);
             }
-
-            if ((!attr.signal[2].isEmpty()))
+            else if (strategy==ST_REPLAY)
             {
-               // qWarning()<<currentFileB.absoluteFilePath();
-                if ((access(currentFileB.absoluteFilePath().toLatin1().data(),F_OK)+1) && isRecordingReg)
+                bool isReplayingReg = isReplaying();
+                if (!isReplayingReg)
                 {
-                    if (fileSeqB==0)
+                    fftBufferB.clear();
+                    fftBufferA.clear();
+                }
+                //qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
+                //<<isRecordingReg;
+                //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isReplayingReg;
+                if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isReplayingReg)
+                {
+                    if (isFirstGNSA)
                     {
-                        if (!getInitialData(currentFileB,&syncModeB,skipWordCountB,
-                                            readWordCountB,attr.numBits[2],&fftBufferB,fpgaSel==1,channelSel,&currentChanB))
+                        if (!getHeader())
                         {
-                            qWarning()<<"Cannot open .000B.";
+                            qWarning()<<"Cannot open header.";
                             break;
                         }
                     }
-                    else
-                        getData(currentFileB,&syncModeB,skipWordCountB,
-                                readWordCountB,attr.numBits[2],&fftBufferB,fpgaSel==1,channelSel,&currentChanB);
-                    toNextFile(&currentFileB,&fileSeqB);
-                }
-            }
-        }
-        else if (strategy==ST_RECORD)
-        {
-            bool isRecordingReg = ((isRecording()) && (!isSetupMode()));
-            //qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
-            //<<isRecordingReg;
-            //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isRecordingReg;
-            if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isRecordingReg)
-            {
-                if (isFirstGNSA)
-                {
-                    if (!getHeader())
+                    if (attr.signal[(int)fpgaSel*2+(int)channelSel].isEmpty())
                     {
-                        qWarning()<<"Cannot open header.";
+                        emit signalError();
+                        break;
+                    }
+                    if (!gnsFileA.isOpen())
+                    {
+                        qWarning()<<"accessA: "<<(access(currentFileA.absoluteFilePath().toLatin1().data(),R_OK)+1);
+                        qWarning()<<"openA: "<<gnsFileA.open(QIODevice::ReadOnly);
+                    }
+                    if ((!gnsFileB.isOpen()) && (!attr.signal[2].isEmpty()))
+                    {
+                        qWarning()<<"accessB: "<<(access(currentFileB.absoluteFilePath().toLatin1().data(),R_OK)+1);
+                        qWarning()<<"openB: "<<gnsFileB.open(QIODevice::ReadOnly);
+                    }
+                    if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
+                                    readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
+                                    &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
+                                    readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
+                    {
+                        qWarning()<<"Cannot open .A.gns.";
                         break;
                     }
                 }
-                if (attr.signal[(int)fpgaSel*2+(int)channelSel].isEmpty())
-                {
-                    emit signalError();
-                    break;
-                }
-                if (!gnsFileA.isOpen())
-                {
-                    qWarning()<<"access: "<<(access(currentFileA.absoluteFilePath().toLatin1().data(),R_OK)+1);
-                    qWarning()<<"open: "<<gnsFileA.open(QIODevice::ReadOnly);
-                }
-                if ((!gnsFileB.isOpen()) && (!attr.signal[2].isEmpty()))
-                {
-                    qWarning()<<"access: "<<(access(currentFileB.absoluteFilePath().toLatin1().data(),R_OK)+1);
-                    qWarning()<<"open: "<<gnsFileB.open(QIODevice::ReadOnly);
-                }
-                if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
-                                readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
-                                &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
-                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
-                {
-                    qWarning()<<"Error";
-                    break;
-                }
             }
-        }
-        else if (strategy==ST_REPLAY)
-        {
-            bool isReplayingReg = isReplaying();
-            if (!isReplayingReg)
+            else
             {
-                fftBufferB.clear();
-                fftBufferA.clear();
-            }
-            //qWarning()<<currentFileA.absoluteFilePath()<<currentFileA.exists()
-            //<<isRecordingReg;
-            //qWarning()<<currentFileA.absoluteFilePath().toLatin1().data()<<access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)<<isReplayingReg;
-            if ((access(currentFileA.absoluteFilePath().toLatin1().data(),F_OK)+1)   &&  isReplayingReg)
-            {
-                if (isFirstGNSA)
-                {
-                    if (!getHeader())
-                    {
-                        qWarning()<<"Cannot open header.";
-                        break;
-                    }
-                }
-                if (attr.signal[(int)fpgaSel*2+(int)channelSel].isEmpty())
-                {
-                    emit signalError();
-                    break;
-                }
-                if (!gnsFileA.isOpen())
-                {
-                    qWarning()<<"accessA: "<<(access(currentFileA.absoluteFilePath().toLatin1().data(),R_OK)+1);
-                    qWarning()<<"openA: "<<gnsFileA.open(QIODevice::ReadOnly);
-                }
-                if ((!gnsFileB.isOpen()) && (!attr.signal[2].isEmpty()))
-                {
-                    qWarning()<<"accessB: "<<(access(currentFileB.absoluteFilePath().toLatin1().data(),R_OK)+1);
-                    qWarning()<<"openB: "<<gnsFileB.open(QIODevice::ReadOnly);
-                }
-                if (!getGNSData(&gnsFileA,&inputStreamA,&syncModeA,skipWordCountA,
-                                readWordCountA,attr.numBits[0],&fftBufferA,&currentChanA,&isFirstGNSA,
-                                &gnsFileB,&inputStreamB,&syncModeB,skipWordCountB,
-                                readWordCountB,attr.numBits[2],&fftBufferB,&currentChanB,&isFirstGNSB,(!attr.signal[2].isEmpty())))
-                {
-                    qWarning()<<"Cannot open .A.gns.";
-                    break;
-                }
+                qWarning()<<"Error: State Error" ;
             }
         }
-        else
-        {
-            qWarning()<<"Error: State Error" ;
-        }
-    }
 
-    if (gnsFileA.isOpen())
-        gnsFileA.close();
-    if (gnsFileB.isOpen())
-        gnsFileB.close();
-    timer->stop();
-    quit();
-    isAlive=false;
-    delete pollingProc;
-    if (strategy==ST_SETUP)
-        clearRamDisk();
-    emit threadTerminated();
+        if (gnsFileA.isOpen())
+            gnsFileA.close();
+        if (gnsFileB.isOpen())
+            gnsFileB.close();
+        timer->stop();
+        isAlive=false;
+        delete pollingProc;
+        if (strategy==ST_SETUP)
+            clearRamDisk();
+        emit threadTerminated();
+    }
 }
 
 void RTReadingThread::toNextFile(QFileInfo* currentFile,int *seq)
@@ -403,10 +407,10 @@ int RTReadingThread::getHeader()
             else if (str.startsWith("-S"))
                 attr.bw[sig]=str.mid(2).toInt();
             else if (str.startsWith("-b"))
-                {
-                    if (attr.isSetupMode) attr.numBits[sig]=16;
-                    else attr.numBits[sig]=str.mid(2).toInt();
-                }
+            {
+                if (attr.isSetupMode) attr.numBits[sig]=16;
+                else attr.numBits[sig]=str.mid(2).toInt();
+            }
             else if (str.startsWith("-M"))
                 attr.freq[sig]=str.mid(2).toFloat();
         }
@@ -726,7 +730,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
     while ((!endOfFile_A)|((!endOfFile_B) && (hasB)))
     {
         if (!isAlive) break;
-        if (isStopped()) break;
+        if ((isStopped()) && (strategy!=ST_RECORD)) break;
         if (!(endOfFile_A))
         {
             if ((fpgaSel==0)&&(skipWordCount_A[0]==skipWordCount_A[1]))
@@ -769,12 +773,16 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                 }
 
                 while ((ptr2Buffer_A->length()==BUFFER_SIZE)&&(strategy==ST_REPLAY))
-                    msleep(100);
+                    msleep(200);
                 mutex.lock();
                 if ((ptr2Buffer_A->length()==BUFFER_SIZE)&&(strategy==ST_RECORD))
+                {
                     ptr2Buffer_A->removeFirst();
+                    emit overflow();
+                    qWarning()<<"A: overflow";
+                }
                 ptr2Buffer_A->append(currentFFTSamples);
-                qWarning()<<"new appeneded";
+                //qWarning()<<"new appeneded";
                 mutex.unlock();
             }
 
@@ -979,10 +987,12 @@ int RTReadingThread::word2sample(quint32 *word, int numBits, qint32 *outI,qint32
 
 void RTReadingThread::onTimeOut()
 {
+    if (fftBufferA.length()>PRELOAD_SIZE)             startFlag = true;
+    if (!startFlag) return;
     if (!fpgaSel)
     {
         mutex.lock();
-        if (fftBufferA.length()>1)
+        if (fftBufferA.length()>0)
         {
             emit sendFFTSamples(fftBufferA.first(),attr.numBits[0],strategy==ST_SETUP);
             //saveToTxt(fftBufferA.first(),attr.numBits[0]);
@@ -990,12 +1000,16 @@ void RTReadingThread::onTimeOut()
             fftBufferA.reserve(BUFFER_SIZE);
             //qWarning()<<"sample sent A";
         }
+        else
+        {
+            qWarning()<<"A: underflow";
+        }
         mutex.unlock();
     }
     else
     {
         mutex.lock();
-        if (fftBufferB.length()>1)
+        if (fftBufferB.length()>0)
         {
             emit sendFFTSamples(fftBufferB.first(),attr.numBits[2],strategy==ST_SETUP);
             //saveToTxt(fftBufferA.first(),attr.numBits[0]);
@@ -1009,42 +1023,42 @@ void RTReadingThread::onTimeOut()
 
 int RTReadingThread::saveToTxt(FFTSamples samples, int numOfBits)
 {
-    QFile samplePool("/tmp/IFsample.txt");
-    if (!samplePool.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
-             return 0;
-    QTextStream writeStream(&samplePool);
-    writeStream.setCodec("UTF-16");
-    writeStream.setGenerateByteOrderMark(true);
-    writeStream<<"_C"<<QString::number(samples.chan);
-    writeStream<<"_B"<<QString::number(numOfBits);
-    writeStream<<"\r\n";
-    writeStream<<"_V";
-    for (int i=0;i<32768;i++)
-    {
-        if ((samples.valuesI[i]+32768)<0x0021)
-            writeStream<<QChar(samples.valuesI[i]+32768+67328);
-        else if ((samples.valuesI[i]+32768)>0xFFFD)
-            writeStream<<QChar(samples.valuesI[i]+32768+2);
-        else if (((samples.valuesI[i]+32768)>=0xFDD0) && (((samples.valuesI[i]+32768)<=0xFDEF) ))
-            writeStream<<QChar(samples.valuesI[i]+32768+12288);
-        else if (((samples.valuesI[i]+32768)>0xDFFF) | (((samples.valuesI[i]+32768)<0xD800) ))
-            writeStream<<QChar(samples.valuesI[i]+32768);
-        else
-            writeStream<<QChar(samples.valuesI[i]+32768+12288);
+    //    QFile samplePool("/tmp/IFsample.txt");
+    //    if (!samplePool.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+    //             return 0;
+    //    QTextStream writeStream(&samplePool);
+    //    writeStream.setCodec("UTF-16");
+    //    writeStream.setGenerateByteOrderMark(true);
+    //    writeStream<<"_C"<<QString::number(samples.chan);
+    //    writeStream<<"_B"<<QString::number(numOfBits);
+    //    writeStream<<"\r\n";
+    //    writeStream<<"_V";
+    //    for (int i=0;i<32768;i++)
+    //    {
+    //        if ((samples.valuesI[i]+32768)<0x0021)
+    //            writeStream<<QChar(samples.valuesI[i]+32768+67328);
+    //        else if ((samples.valuesI[i]+32768)>0xFFFD)
+    //            writeStream<<QChar(samples.valuesI[i]+32768+2);
+    //        else if (((samples.valuesI[i]+32768)>=0xFDD0) && (((samples.valuesI[i]+32768)<=0xFDEF) ))
+    //            writeStream<<QChar(samples.valuesI[i]+32768+12288);
+    //        else if (((samples.valuesI[i]+32768)>0xDFFF) | (((samples.valuesI[i]+32768)<0xD800) ))
+    //            writeStream<<QChar(samples.valuesI[i]+32768);
+    //        else
+    //            writeStream<<QChar(samples.valuesI[i]+32768+12288);
 
-        if ((samples.valuesQ[i]+32768)<0x0021)
-            writeStream<<QChar(samples.valuesQ[i]+32768+67328);
-        else if ((samples.valuesQ[i]+32768)>0xFFFD)
-            writeStream<<QChar(samples.valuesQ[i]+32768+2);
-        else if (((samples.valuesQ[i]+32768)>=0xFDD0) && (((samples.valuesQ[i]+32768)<=0xFDEF) ))
-            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
-        else if (((samples.valuesQ[i]+32768)>0xDFFF) | (((samples.valuesQ[i]+32768)<0xD800) ))
-            writeStream<<QChar(samples.valuesQ[i]+32768);
-        else
-            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
-    }
-    samplePool.close();
-    return 1;
+    //        if ((samples.valuesQ[i]+32768)<0x0021)
+    //            writeStream<<QChar(samples.valuesQ[i]+32768+67328);
+    //        else if ((samples.valuesQ[i]+32768)>0xFFFD)
+    //            writeStream<<QChar(samples.valuesQ[i]+32768+2);
+    //        else if (((samples.valuesQ[i]+32768)>=0xFDD0) && (((samples.valuesQ[i]+32768)<=0xFDEF) ))
+    //            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
+    //        else if (((samples.valuesQ[i]+32768)>0xDFFF) | (((samples.valuesQ[i]+32768)<0xD800) ))
+    //            writeStream<<QChar(samples.valuesQ[i]+32768);
+    //        else
+    //            writeStream<<QChar(samples.valuesQ[i]+32768+12288);
+    //    }
+    //    samplePool.close();
+    //    return 1;
 }
 
 int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanSel,quint32 *bufferWord,int *currentChan)
@@ -1153,7 +1167,6 @@ int RTReadingThread::skipWords(QDataStream * inputStream,int syncMode,int *skipW
     }
     else if (*currentChan==1)
     {
-        int skipped;
         skipped = inputStream->skipRawData(8*skipWordCount[0]);
         if (skipped/4%2==0)
         {
@@ -1411,4 +1424,18 @@ bool RTReadingThread::removeDir(const QString & dirName)
         }
     }
     return result;
+}
+
+void RTReadingThread::clearBuffer()
+{
+    mutex.lock();
+    if (fpgaSel==0)
+        emit overflow(fftBufferA.length());
+    else
+        emit overflow(fftBufferB.length());
+    fftBufferA.clear();
+    fftBufferA.reserve(BUFFER_SIZE);
+    fftBufferB.clear();
+    fftBufferB.reserve(BUFFER_SIZE);
+    mutex.unlock();
 }

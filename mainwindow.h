@@ -5,6 +5,7 @@
 #include <QSharedMemory>
 #include "rtreadingthread.h"
 #include "qcustomplot.h"
+#include "sharedcontrol.h"
 
 namespace Ui {
 class MainWindow;
@@ -30,6 +31,10 @@ public:
     ~MainWindow();
     RTReadingThread *readingThread;
     QCPBars* bars1;
+    SharedControl *ptrMem;
+    QSharedMemory *sharedMem;
+    void syncUiToShared();
+    QTimer *timer;
 private:
     int frameCount;
     SpectrumSamples tmpSpectrumSamples;
@@ -46,6 +51,7 @@ private:
     bool removeDir(const QString & dirName);
     Ui::MainWindow *ui;
     Attributes attri;
+    bool isShmSuccess;
 private slots:
     void onHeaderRcvd(QString header);
     void onAttrRcvd(Attributes attr);
@@ -76,6 +82,8 @@ private slots:
     void on_pushButton_3_clicked();
     void on_pushButton_10_clicked();
     void onInitialisation();
+    void onOverflow(int num);
+    void onUiSelectionUpdated();
 };
 
 #endif // MAINWINDOW_H

@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->widget_2->yAxis,SIGNAL(rangeChanged(QCPRange,QCPRange)),this,SLOT(on2YAxisRangeChanged(QCPRange,QCPRange)));
     connect(readingThread,SIGNAL(signalError()),this,SLOT(onSignalError()));
     connect(readingThread,SIGNAL(initToUi()),this,SLOT(onInitialisation()));
-
+    connect(readingThread,SIGNAL(overflow(int)),this,SLOT(onOverflow(int)));
     ui->buttonGroup->setId(ui->radioButton,0);
     ui->buttonGroup->setId(ui->radioButton_2,1);
     ui->buttonGroup->setId(ui->radioButton_3,2);
@@ -88,8 +88,6 @@ MainWindow::MainWindow(QWidget *parent) :
 //    textChan1->setText("chan");
 //    textTime1->setText("time");
 
-
-
     frameCount=0;
     currentChan=-1;
     currentHistoBd=-1;
@@ -109,17 +107,104 @@ MainWindow::MainWindow(QWidget *parent) :
         QDir("/tmp").mkdir("/tmp/img_buffer_his");
 
     readingThread->setRamDiskPath("/run/shm");
+    //qWarning()<<QApplication::instance()->thread();
 
-    readingThread->start(QThread::NormalPriority);
-    frameCount=0;
+    timer = new QTimer(this);
+    connect(timer,SIGNAL(timeout()),this,SLOT(onUiSelectionUpdated()));
+
+    sharedMem = new QSharedMemory("shm_rt",this);
+    if (!sharedMem->create(sizeof(SharedControl)))
+    {
+        qWarning()<<"Shared memory allocation failed.";
+        QMessageBox msgBox;
+        msgBox.setText("Shared memory allocation failed.");
+        isShmSuccess=false;
+        msgBox.exec();
+    }
+    else
+    {
+        ptrMem = (SharedControl *) sharedMem->data();
+        syncUiToShared();
+        readingThread->start();
+        isShmSuccess=true;
+    }
+    timer->start(1000);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
     readingThread->isAlive=false;
+    readingThread->terminate();
     readingThread->wait();
     delete readingThread;
+    delete timer;
+    qWarning()<<"shm detachment: "<<sharedMem->detach();
+    delete sharedMem;
+}
+
+void MainWindow::onUiSelectionUpdated()
+{
+    if (!isShmSuccess) {this->close();return;}
+    //qWarning()<<"UI updated";
+    if (!((ptrMem->chanSel==(ui->buttonGroup->checkedId())%2)
+            && (ptrMem->fpgaSel==(ui->buttonGroup->checkedId())/2)))
+        ui->buttonGroup->button((ptrMem->fpgaSel)*2+(ptrMem->chanSel))->animateClick(100);
+
+    if (ptrMem->avrgSpec==AV_1) ui->comboBox->setCurrentIndex(0);
+    else if (ptrMem->avrgSpec==AV_8) ui->comboBox->setCurrentIndex(1);
+    else if (ptrMem->avrgSpec==AV_16) ui->comboBox->setCurrentIndex(2);
+    else if (ptrMem->avrgSpec==AV_32) ui->comboBox->setCurrentIndex(3);
+
+    if (ptrMem->avrgHisto==AV_1) ui->comboBox_2->setCurrentIndex(0);
+    else if (ptrMem->avrgHisto==AV_8) ui->comboBox_2->setCurrentIndex(1);
+    else if (ptrMem->avrgHisto==AV_16) ui->comboBox_2->setCurrentIndex(2);
+    else if (ptrMem->avrgHisto==AV_32) ui->comboBox_2->setCurrentIndex(3);
+}
+
+void MainWindow::syncUiToShared()
+{
+    ptrMem->chanSel=(ui->buttonGroup->checkedId())%2;
+    ptrMem->fpgaSel=(ui->buttonGroup->checkedId())/2;
+    switch (ui->comboBox_2->currentIndex())
+    {
+    case 0:
+        ptrMem->avrgHisto=AV_1;
+        break;
+    case 1:
+        ptrMem->avrgHisto=AV_8;
+        break;
+    case 2:
+        ptrMem->avrgHisto=AV_16;
+        break;
+    case 3:
+        ptrMem->avrgHisto=AV_32;
+        break;
+    default:
+        ptrMem->avrgHisto=AV_N;
+        break;
+    }
+
+    switch (ui->comboBox->currentIndex())
+    {
+    case 0:
+        ptrMem->avrgSpec=AV_1;
+        break;
+    case 1:
+        ptrMem->avrgSpec=AV_8;
+        break;
+    case 2:
+        ptrMem->avrgSpec=AV_16;
+        break;
+    case 3:
+        ptrMem->avrgSpec=AV_32;
+        break;
+    default:
+        ptrMem->avrgSpec=AV_N;
+        break;
+    }
+
+    ptrMem->isValid = true;
 }
 
 void MainWindow::onInitialisation()
@@ -192,17 +277,14 @@ void MainWindow::onAttrRcvd(Attributes attr)
 
 void MainWindow::onThreadTerminated()
 {
-    readingThread->wait();
-    if (!readingThread->isRunning())
-    {
-        ui->radioButton->setEnabled(false);
-        ui->radioButton_2->setEnabled(false);
-        ui->radioButton_3->setEnabled(false);
-        ui->radioButton_4->setEnabled(false);
-        ui->radioButton->setChecked(true);
-        ui->comboBox_4->setDisabled(true);
-        ui->comboBox_3->setDisabled(true);
-    }
+
+    ui->radioButton->setEnabled(false);
+    ui->radioButton_2->setEnabled(false);
+    ui->radioButton_3->setEnabled(false);
+    ui->radioButton_4->setEnabled(false);
+    ui->radioButton->setChecked(true);
+    ui->comboBox_4->setDisabled(true);
+    ui->comboBox_3->setDisabled(true);
     ui->textBrowser->clear();
     ui->label_14->setText("---");
     ui->treeWidget->clear();
@@ -215,17 +297,20 @@ void MainWindow::onThreadTerminated()
     ui->radioButton_3->setEnabled(true);
     ui->radioButton_4->setEnabled(true);
 
+    removeDir("/tmp/img_buffer_spe");
+    removeDir("/tmp/img_buffer_his");
 
-    usleep(1000*10);
-
-    readingThread->start(QThread::HighPriority);
+    frameCount = 0;
 }
 
 void MainWindow::onChannelSelChanged(int id)
 {
     qWarning()<<"Checked Id: "<< id;
+    readingThread->clearBuffer();
     readingThread->setChannel(ui->buttonGroup->checkedId());
+    ptrMem->chanSel = (ui->buttonGroup->checkedId())%2;
     readingThread->setFPGASel((ui->buttonGroup->checkedId())/2);
+    ptrMem->fpgaSel = (ui->buttonGroup->checkedId())/2;
 }
 
 void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMode)
@@ -466,12 +551,48 @@ void MainWindow::on_comboBox_2_currentIndexChanged(const QString &arg1)
 {
     QString tmpStr(ui->comboBox_2->currentText());
     histoNumAvg = tmpStr.toInt();
+    switch (ui->comboBox_2->currentIndex())
+    {
+    case 0:
+        ptrMem->avrgHisto=AV_1;
+        break;
+    case 1:
+        ptrMem->avrgHisto=AV_8;
+        break;
+    case 2:
+        ptrMem->avrgHisto=AV_16;
+        break;
+    case 3:
+        ptrMem->avrgHisto=AV_32;
+        break;
+    default:
+        ptrMem->avrgHisto=AV_N;
+        break;
+    }
 }
 
 void MainWindow::on_comboBox_currentIndexChanged(const QString &arg1)
 {
     QString tmpStr(ui->comboBox->currentText());
     spectrumNumAvg = tmpStr.toInt();
+    switch (ui->comboBox->currentIndex())
+    {
+    case 0:
+        ptrMem->avrgSpec=AV_1;
+        break;
+    case 1:
+        ptrMem->avrgSpec=AV_8;
+        break;
+    case 2:
+        ptrMem->avrgSpec=AV_16;
+        break;
+    case 3:
+        ptrMem->avrgSpec=AV_32;
+        break;
+    default:
+        ptrMem->avrgSpec=AV_N;
+        break;
+    }
 }
 
 void MainWindow::on_pushButton_5_clicked()
@@ -589,4 +710,9 @@ bool MainWindow::removeDir(const QString & dirName)
         }
     }
     return result;
+}
+
+void MainWindow::onOverflow(int num)
+{
+    frameCount = frameCount+num;
 }

@@ -21,7 +21,8 @@ SOURCES += main.cpp\
 
 HEADERS  += mainwindow.h \
     qcustomplot.h \
-    rtreadingthread.h
+    rtreadingthread.h \
+    sharedcontrol.h
 
 FORMS    += mainwindow.ui
 CONFIG += debug_and_release

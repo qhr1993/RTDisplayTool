@@ -40,6 +40,7 @@ public:
     void resetSync();
     bool isAlive;
     Strategy strategy;
+    void clearBuffer();
 private:
     QFileInfo currentFileA,currentFileB,endFileA,endFileB;
     void toNextFile(QFileInfo *currentFile,int *seq);
@@ -66,7 +67,6 @@ private:
     qint32 sampleIFromWord[8],sampleQFromWord[8];
     QMutex mutex;
     QTimer *timer;
-    //int readOneWord(int syncMode);
     int currentChanA,currentChanB;
     int readWords(QDataStream * inputStream,int syncMode,bool chanSel,quint32 *bufferWord,int *currentChan);
     int skipWords(QDataStream * inputStream,int syncMode,int *skipWordCount,int *currentChan);
@@ -84,6 +84,7 @@ private:
     int isSetupMode();
     int isStopped();
     int saveToTxt(FFTSamples samples,int numOfBits);
+    bool startFlag;
 signals:
     void dispHeader(QString header);
     void dispAttr(Attributes attr);
@@ -91,6 +92,7 @@ signals:
     void sendFFTSamples(FFTSamples samples,int numOfBits,bool isSetup);
     void signalError();
     void initToUi();
+    void overflow(int num=1);
 private slots:
     void onTimeOut();
 };
