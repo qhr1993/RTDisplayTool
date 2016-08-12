@@ -9,6 +9,7 @@ typedef struct {
     bool isValid;
     int chanSel;
     int fpgaSel;
+    int fftPoints;
     Avrg avrgSpec;
     Avrg avrgHisto;
     Avrg resDiv;

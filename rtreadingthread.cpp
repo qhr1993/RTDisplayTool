@@ -42,6 +42,9 @@ RTReadingThread::RTReadingThread(QObject *parent):QThread(parent)
 RTReadingThread::~RTReadingThread()
 {
     delete timer;
+    this->isAlive=false;
+    this->terminate();
+    this->wait();
 }
 
 void RTReadingThread::run()

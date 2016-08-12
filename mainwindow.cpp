@@ -115,6 +115,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(timer,SIGNAL(timeout()),this,SLOT(onUiSelectionUpdated()));
 
     sharedMem = new QSharedMemory("shm_rt",this);
+    sharedMem->attach();
+    sharedMem->detach();
+    sleep(1);
     if (!sharedMem->create(sizeof(SharedControl)))
     {
         qWarning()<<"Shared memory allocation failed.";
@@ -136,9 +139,9 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
-    readingThread->isAlive=false;
-    readingThread->terminate();
-    readingThread->wait();
+//    readingThread->isAlive=false;
+//    readingThread->terminate();
+//    readingThread->wait();
     delete readingThread;
     delete timer;
     qWarning()<<"shm detachment: "<<sharedMem->detach();
@@ -162,12 +165,15 @@ void MainWindow::onUiSelectionUpdated()
     else if (ptrMem->avrgHisto==AV_8) ui->comboBox_2->setCurrentIndex(1);
     else if (ptrMem->avrgHisto==AV_16) ui->comboBox_2->setCurrentIndex(2);
     else if (ptrMem->avrgHisto==AV_32) ui->comboBox_2->setCurrentIndex(3);
+
+    ui->comboBox_5->setCurrentIndex(ptrMem->fftPoints);
 }
 
 void MainWindow::syncUiToShared()
 {
     ptrMem->chanSel=(ui->buttonGroup->checkedId())%2;
     ptrMem->fpgaSel=(ui->buttonGroup->checkedId())/2;
+    ptrMem->fftPoints=(ui->comboBox_5->currentIndex());;
     switch (ui->comboBox_2->currentIndex())
     {
     case 0:
@@ -238,6 +244,9 @@ void MainWindow::onInitialisation()
         readingThread->setFPGASel(0);
     else
         readingThread->setFPGASel(1);
+
+    removeDir("/tmp/img_buffer_spe");
+    removeDir("/tmp/img_buffer_his");
 }
 
 void MainWindow::onHeaderRcvd(QString header)
@@ -726,4 +735,5 @@ void MainWindow::onOverflow(int num)
 void MainWindow::on_comboBox_5_currentIndexChanged(const QString &arg1)
 {
     fftPoints = ui->comboBox_5->currentText().toInt();
+    ptrMem->fftPoints = ui->comboBox_5->currentIndex();
 }
