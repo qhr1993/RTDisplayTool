@@ -58,6 +58,9 @@ public:
     QHBoxLayout *horizontalLayout_7;
     QLabel *label_7;
     QComboBox *comboBox;
+    QSpacerItem *horizontalSpacer_8;
+    QLabel *label_15;
+    QComboBox *comboBox_5;
     QSpacerItem *horizontalSpacer_5;
     QLabel *label;
     QComboBox *comboBox_3;
@@ -232,6 +235,20 @@ public:
         comboBox->setObjectName(QString::fromUtf8("comboBox"));
 
         horizontalLayout_7->addWidget(comboBox);
+
+        horizontalSpacer_8 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayout_7->addItem(horizontalSpacer_8);
+
+        label_15 = new QLabel(tab_2);
+        label_15->setObjectName(QString::fromUtf8("label_15"));
+
+        horizontalLayout_7->addWidget(label_15);
+
+        comboBox_5 = new QComboBox(tab_2);
+        comboBox_5->setObjectName(QString::fromUtf8("comboBox_5"));
+
+        horizontalLayout_7->addWidget(comboBox_5);
 
         horizontalSpacer_5 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
@@ -459,7 +476,7 @@ public:
 
         retranslateUi(MainWindow);
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(1);
 
 
         QMetaObject::connectSlotsByName(MainWindow);
@@ -487,6 +504,17 @@ public:
          << QApplication::translate("MainWindow", "16", 0, QApplication::UnicodeUTF8)
          << QApplication::translate("MainWindow", "32", 0, QApplication::UnicodeUTF8)
          << QApplication::translate("MainWindow", "64", 0, QApplication::UnicodeUTF8)
+        );
+        label_15->setText(QApplication::translate("MainWindow", "FFT Points", 0, QApplication::UnicodeUTF8));
+        comboBox_5->clear();
+        comboBox_5->insertItems(0, QStringList()
+         << QApplication::translate("MainWindow", "32768", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "16384", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "8192", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "4096", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "2048", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "1024", 0, QApplication::UnicodeUTF8)
+         << QApplication::translate("MainWindow", "512", 0, QApplication::UnicodeUTF8)
         );
         label->setText(QApplication::translate("MainWindow", "Bitdepth for Display", 0, QApplication::UnicodeUTF8));
         comboBox_3->clear();

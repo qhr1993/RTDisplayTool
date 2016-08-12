@@ -52,6 +52,7 @@ private:
     Ui::MainWindow *ui;
     Attributes attri;
     bool isShmSuccess;
+    int fftPoints,ifftPoints;
 private slots:
     void onHeaderRcvd(QString header);
     void onAttrRcvd(Attributes attr);
@@ -84,6 +85,7 @@ private slots:
     void onInitialisation();
     void onOverflow(int num);
     void onUiSelectionUpdated();
+    void on_comboBox_5_currentIndexChanged(const QString &arg1);
 };
 
 #endif // MAINWINDOW_H

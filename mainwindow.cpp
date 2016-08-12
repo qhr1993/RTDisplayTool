@@ -97,6 +97,8 @@ MainWindow::MainWindow(QWidget *parent) :
     isSpectrumShown=true;
     isHistoShown=true;
     cursorEnabled=true;
+    fftPoints = (ui->comboBox_5->currentText().toInt());
+    ifftPoints = -1;
 
     readingThread->setGNSFilePath("/home/spirent/Data");
     QDir tmpSpe("/tmp/img_buffer_spe");
@@ -315,8 +317,9 @@ void MainWindow::onChannelSelChanged(int id)
 
 void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMode)
 {
-    bool newFlag=(samples.chan!=currentChan);
+    bool newFlag=((samples.chan!=currentChan)|(fftPoints!=ifftPoints));
     currentChan=samples.chan;
+    ifftPoints = fftPoints;
     bool newSpecBdFlag=(ui->comboBox_3->currentText().toInt()!=currentSpecBd);
     bool newHistoBdFlag=(ui->comboBox_4->currentText().toInt()!=currentHistoBd);
     qint32 specBdFactor,histoBdFactor ;
@@ -360,7 +363,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     //qWarning()<<"sample received";
     fftw_complex *in, *out;
     fftw_plan p;
-    QVector <double> outMagLog(32768),xScale(32768);
+    QVector <double> outMagLog(ifftPoints),xScale(ifftPoints);
     QVector <double>   distribution(64),xScaleDist(64);
     qint32 delta,scale=0;
     if (currentHistoBd<=BITDEPTH_MAX)
@@ -378,13 +381,16 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         distribution.resize(pow(2,currentHistoBd)/scale);
         xScaleDist.resize(distribution.size());
     }
-    in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * 32768);
-    out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * 32768);
-    p = fftw_plan_dft_1d(32768, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+    in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * ifftPoints);
+    out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * ifftPoints);
+    p = fftw_plan_dft_1d(ifftPoints, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
     for (int i=0;i<32768;i++)
     {
-        in[i][0]=(double)((samples.valuesI[i]/specBdFactor)*2+1);
-        in[i][1]=(double)((samples.valuesQ[i]/specBdFactor)*2+1);
+        if (i<ifftPoints)
+        {
+            in[i][0]=(double)((samples.valuesI[i]/specBdFactor)*2+1);
+            in[i][1]=(double)((samples.valuesQ[i]/specBdFactor)*2+1);
+        }
 
         if (currentHistoBd<=BITDEPTH_MAX)
         {
@@ -400,12 +406,12 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         }
     }
     fftw_execute(p); /* repeat as needed */
-    for (int i=0;i<32768;i++)
+    for (int i=0;i<ifftPoints;i++)
     {
-        if (i<16384)
-            xScale[i]=((double)i)/16384*xLimit + xCentre;
+        if (i<ifftPoints/2)
+            xScale[i]=((double)i)/(ifftPoints/2)*xLimit + xCentre;
         else
-            xScale[i]=((double)i-32768)/16384*xLimit + xCentre;
+            xScale[i]=((double)i-ifftPoints)/(ifftPoints/2)*xLimit + xCentre;
         //outMagLog[i]=10*log10(sqrt(((out[i+1][0])*(out[i+1][0])+(out[i+1][1])*(out[i+1][1]))/2));
         outMagLog[i]=(sqrt(((out[i][1])*(out[i][1]))/2));
     }
@@ -430,7 +436,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     QList <double> scaleList = avg(&tmpSpectrumSamples,&sampleSpectrumBuffer);
     yMax = 10*log10(scaleList.first());
     yMin = 10*log10(scaleList.last());
-    for (int i=0;i<32768;i++)
+    for (int i=0;i<ifftPoints;i++)
         tmpSpectrumSamples[i]=10*log10(tmpSpectrumSamples[i]);
     //qWarning()<<tmpSpectrumSamples.at(1024);
     //qWarning()<<sampleSpectrumBuffer.last().at(1024);
@@ -715,4 +721,9 @@ bool MainWindow::removeDir(const QString & dirName)
 void MainWindow::onOverflow(int num)
 {
     frameCount = frameCount+num;
+}
+
+void MainWindow::on_comboBox_5_currentIndexChanged(const QString &arg1)
+{
+    fftPoints = ui->comboBox_5->currentText().toInt();
 }
