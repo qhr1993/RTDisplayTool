@@ -795,7 +795,7 @@ int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStream
                 skipWordCount_A[0]=skipWordCount_A[1];
                 readWordCount_A[0]=readWordCount_A[1];
                 endOfFile_A=false;
-                qWarning()<<"end of fileA: @"<<skipWordCount_A[0]<<" of "<<skipWordCount_A[1];
+                //qWarning()<<"end of fileA: @"<<skipWordCount_A[0]<<" of "<<skipWordCount_A[1];
             }
             else
             {
@@ -1091,16 +1091,16 @@ int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanS
         }
         else if (*currentChan==1)
         {
-            if (!inputStream->skipRawData(4))
+            if (!inputStream->readRawData((char *)bufferWord,4))
             {
-                //*currentChan=1;
+                //*currentChan=0;
                 return (0);
             }
             else
                 *currentChan=0;
-            if (!inputStream->readRawData((char *)bufferWord,4))
+            if (!inputStream->skipRawData(4))
             {
-                //*currentChan=0;
+                //*currentChan=1;
                 return (0);
             }
             else
