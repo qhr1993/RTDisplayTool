@@ -111,12 +111,12 @@ MainWindow::MainWindow(QWidget *parent) :
     readingThread->setRamDiskPath("/run/shm");
     //qWarning()<<QApplication::instance()->thread();
 
-    timer = new QTimer(this);
+    timer = new QTimer(this); // timer for checking shared memory
     connect(timer,SIGNAL(timeout()),this,SLOT(onUiSelectionUpdated()));
 
     sharedMem = new QSharedMemory("shm_rt",this);
     sharedMem->attach();
-    sharedMem->detach();
+    sharedMem->detach();//if shared memory is not destroyed properly, try attach and detach to destroy it
     sleep(1);
     if (!sharedMem->create(sizeof(SharedControl)))
     {
@@ -148,6 +148,7 @@ MainWindow::~MainWindow()
     delete sharedMem;
 }
 
+// update ui status in shm to application's ui
 void MainWindow::onUiSelectionUpdated()
 {
     if (!isShmSuccess) {this->close();return;}
@@ -169,6 +170,7 @@ void MainWindow::onUiSelectionUpdated()
     ui->comboBox_5->setCurrentIndex(ptrMem->fftPoints);
 }
 
+//update application's ui to ui status in shm
 void MainWindow::syncUiToShared()
 {
     ptrMem->chanSel=(ui->buttonGroup->checkedId())%2;
@@ -215,6 +217,7 @@ void MainWindow::syncUiToShared()
     ptrMem->isValid = true;
 }
 
+// on starting a display 
 void MainWindow::onInitialisation()
 {
     readingThread->setChannel(ui->buttonGroup->checkedId());
@@ -249,11 +252,13 @@ void MainWindow::onInitialisation()
     removeDir("/tmp/img_buffer_his");
 }
 
+//display header
 void MainWindow::onHeaderRcvd(QString header)
 {
     ui->textBrowser->setText(header);
 }
 
+//display header in a tree view
 void MainWindow::onAttrRcvd(Attributes attr)
 {
     ui->treeWidget->clear();
@@ -286,6 +291,7 @@ void MainWindow::onAttrRcvd(Attributes attr)
     }
 }
 
+//on terminating a display
 void MainWindow::onThreadTerminated()
 {
 
@@ -314,6 +320,7 @@ void MainWindow::onThreadTerminated()
     frameCount = 0;
 }
 
+// when channel selection (radio button selection) changed
 void MainWindow::onChannelSelChanged(int id)
 {
     qWarning()<<"Checked Id: "<< id;
@@ -324,6 +331,7 @@ void MainWindow::onChannelSelChanged(int id)
     ptrMem->fpgaSel = (ui->buttonGroup->checkedId())/2;
 }
 
+// on receiving a valid sample from thread reading the file
 void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMode)
 {
     bool newFlag=((samples.chan!=currentChan)|(fftPoints!=ifftPoints));
@@ -392,7 +400,7 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     }
     in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * ifftPoints);
     out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * ifftPoints);
-    p = fftw_plan_dft_1d(ifftPoints, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+    p = fftw_plan_dft_1d(ifftPoints, in, out, FFTW_FORWARD, FFTW_ESTIMATE);// do fft using fftw
     for (int i=0;i<32768;i++)
     {
         if (i<ifftPoints)
@@ -471,6 +479,8 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
     //qWarning()<<distribution;
     ui->label_4->setText(QString::number(samples.chan));
     ui->label_9->setText(QString::number(samples.chan));
+    
+    //delete old images in /tmp
     if (newFlag | (frameCount%30==0))
     {
         ui->widget->yAxis->setRangeLower(-5+yMin);
@@ -480,7 +490,8 @@ void MainWindow::onFFTSampleRcvd(FFTSamples samples,int numOfBits,bool isSetupMo
         removeDir("/tmp/img_buffer_spe");
         removeDir("/tmp/img_buffer_his");
     }
-
+    
+    //generate images/info to /tmp for the usage of remote web interface
     QDir::setCurrent("/tmp/img_buffer_spe");
     ui->widget->saveJpg(QTime::currentTime().toString("hhmmsszzz-SPE")+".jpg",400,300);
     QDir::setCurrent("/tmp/img_buffer_his");
@@ -700,7 +711,7 @@ void MainWindow::on_pushButton_10_clicked()
     ui->widget_2->yAxis->setRangeUpper(1.2*y2Max);
 }
 
-
+// clear contents in dir
 bool MainWindow::removeDir(const QString & dirName)
 {
     bool result = true;
@@ -727,6 +738,7 @@ bool MainWindow::removeDir(const QString & dirName)
     return result;
 }
 
+// correct the frame counter when overflowing
 void MainWindow::onOverflow(int num)
 {
     frameCount = frameCount+num;

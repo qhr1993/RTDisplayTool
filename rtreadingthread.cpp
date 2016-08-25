@@ -63,7 +63,7 @@ void RTReadingThread::run()
             //qWarning()<<"mode: STOPPED";
             msleep(100);
         }
-
+	// record/replay/setup detected
         isAlive=true;
         timer->start(TIMER_MSEC);
         startFlag = false;
@@ -318,6 +318,7 @@ void RTReadingThread::run()
     }
 }
 
+// handle suffix of next file to be read on ramdisk
 void RTReadingThread::toNextFile(QFileInfo* currentFile,int *seq)
 {
     (*seq)++;
@@ -380,6 +381,7 @@ int RTReadingThread::getHeader(QDir targetDir)
 }
 *******/
 
+// polling record/replay configurations
 int RTReadingThread::getHeader()
 {
     if (strategy!=ST_REPLAY)
@@ -435,6 +437,7 @@ int RTReadingThread::getHeader()
     return 1;
 }
 
+// read data from ramdisk
 void RTReadingThread::getData(QFileInfo targetFile,int *syncMode,int *skipWordCount,int *readWordCount,
                               int numBits,FFTSampleBuffer *ptr2Buffer,bool readSel,bool chanSel,int *currentChan)
 {
@@ -524,6 +527,7 @@ void RTReadingThread::getData(QFileInfo targetFile,int *syncMode,int *skipWordCo
     return;
 }
 
+// read sync words from ramdisk
 int RTReadingThread::getInitialData(QFileInfo targetFile,int *syncMode,int *skipWordCount,int *readWordCount,
                                     int numBits,FFTSampleBuffer *ptr2Buffer,bool readSel,bool chanSel,int *currentChan)
 {
@@ -636,6 +640,7 @@ int RTReadingThread::getInitialData(QFileInfo targetFile,int *syncMode,int *skip
     return 1;
 }
 
+//read data from gns files
 int RTReadingThread::getGNSData(QFile* currentFilePtr_A,QDataStream* inputStreamPtr_A, int *syncMode_A, int *skipWordCount_A, int *readWordCount_A,
                                 int numBits_A, FFTSampleBuffer *ptr2Buffer_A,int *currentChan_A,bool* isFirst_A,
                                 QFile* currentFilePtr_B,QDataStream* inputStreamPtr_B, int *syncMode_B, int *skipWordCount_B, int *readWordCount_B,
@@ -900,6 +905,7 @@ void RTReadingThread::resetSync()
     syncModeB=-1;
 }
 
+// reorder byte order (actually not needed - big endian by default)
 void RTReadingThread::reorderWord(quint32 *word)
 {
     unsigned char tmp[4];
@@ -916,6 +922,7 @@ void RTReadingThread::reorderWord(quint32 *word)
     //    memcpy(word, tmp, sizeof(*word));
 }
 
+//translate word to number (quatisation level)
 int RTReadingThread::word2sample(quint32 *word, int numBits, qint32 *outI,qint32 *outQ)
 {
     int numSample;
@@ -988,6 +995,7 @@ int RTReadingThread::word2sample(quint32 *word, int numBits, qint32 *outI,qint32
     return numSample;
 }
 
+// buffer manipulation on timeouts
 void RTReadingThread::onTimeOut()
 {
     if (fftBufferA.length()>PRELOAD_SIZE)             startFlag = true;
@@ -1023,6 +1031,7 @@ void RTReadingThread::onTimeOut()
         mutex.unlock();
     }
 }
+
 
 int RTReadingThread::saveToTxt(FFTSamples samples, int numOfBits)
 {
@@ -1064,6 +1073,7 @@ int RTReadingThread::saveToTxt(FFTSamples samples, int numOfBits)
     //    return 1;
 }
 
+// take care of synchronisation while reading words
 int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanSel,quint32 *bufferWord,int *currentChan)
 {
     if (syncMode==0)
@@ -1147,6 +1157,7 @@ int RTReadingThread::readWords(QDataStream * inputStream,int syncMode,bool chanS
     return 1;
 }
 
+// taking care of synchronisation when skipping words
 int RTReadingThread::skipWords(QDataStream * inputStream,int syncMode,int *skipWordCount,int *currentChan)
 {
     int skipped;
@@ -1185,6 +1196,7 @@ int RTReadingThread::skipWords(QDataStream * inputStream,int syncMode,int *skipW
     return (0);
 }
 
+// for 12 bits mode (not tested)
 int RTReadingThread::readWords12(QDataStream *inputStream, int syncMode, bool chanSel, quint32 *bufferWord, int *currentChan)
 {
     if (syncMode==0)
@@ -1268,6 +1280,7 @@ int RTReadingThread::readWords12(QDataStream *inputStream, int syncMode, bool ch
     return 1;
 }
 
+//for 12 bit mode (not tested)
 int RTReadingThread::skipWords12(QDataStream *inputStream, int syncMode, int *skipWordCount, int *currentChan)
 {
     int skipped;
@@ -1307,6 +1320,7 @@ int RTReadingThread::skipWords12(QDataStream *inputStream, int syncMode, int *sk
     return (0);
 }
 
+//for 12 bit mode (not tested)
 int RTReadingThread::read3Words(QDataStream *inputStream, quint32 *bufferWord)
 {
     if  (!inputStream->readRawData((char *)bufferWord,4))
@@ -1324,6 +1338,7 @@ int RTReadingThread::read3Words(QDataStream *inputStream, quint32 *bufferWord)
     return 1;
 }
 
+//for 12 bit mode (not tested)
 int RTReadingThread::skip3Words(QDataStream *inputStream,int skipLen)
 {
     int skipped=0;
@@ -1334,6 +1349,7 @@ int RTReadingThread::skip3Words(QDataStream *inputStream,int skipLen)
     return skipped;//this is how many THREE-WORD blocks are skipped
 }
 
+//for 12 bit mode (not tested)
 void RTReadingThread::subWordRead(int times)
 {
     for (int i=0;i<times;i++)
@@ -1345,6 +1361,7 @@ void RTReadingThread::subWordRead(int times)
     }
 }
 
+// query shm for status
 int RTReadingThread::isRecording()
 {
     pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
@@ -1358,6 +1375,7 @@ int RTReadingThread::isRecording()
         return 0;
 }
 
+// query shm for status
 int RTReadingThread::isStopped()
 {
     pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
@@ -1371,6 +1389,7 @@ int RTReadingThread::isStopped()
         return 0;
 }
 
+// query shm for status
 int RTReadingThread::isReplaying()
 {
     pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-m");
@@ -1384,6 +1403,7 @@ int RTReadingThread::isReplaying()
         return 0;
 }
 
+// query shm for status
 int RTReadingThread::isSetupMode()
 {
     pollingProc->start("/home/spirent/Projects/App/shm_get",QStringList()<<"-K");
@@ -1403,6 +1423,7 @@ void RTReadingThread::clearRamDisk()
     removeDir(ramDiskPathB.absolutePath());
 }
 
+//remove all contents in dir
 bool RTReadingThread::removeDir(const QString & dirName)
 {
     bool result = true;
@@ -1429,6 +1450,7 @@ bool RTReadingThread::removeDir(const QString & dirName)
     return result;
 }
 
+// clear buffer of data samples
 void RTReadingThread::clearBuffer()
 {
     mutex.lock();
